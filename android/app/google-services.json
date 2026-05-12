@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "94600198569",
+    "project_id": "proyekagentdoctor",
+    "storage_bucket": "proyekagentdoctor.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:94600198569:android:efc42a1458889e1fbd6cb8",
+        "android_client_info": {
+          "package_name": "com.example.agent_doctor"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDQo6GKEikm8DBhpd3Bq4iKcbNyLOahv6U"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
