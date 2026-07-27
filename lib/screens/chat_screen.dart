@@ -198,14 +198,6 @@ class _ChatScreenState extends State<ChatScreen> {
               padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
               child: Row(
                 children: [
-                  GestureDetector(
-                    onTap: () => Navigator.pop(context),
-                    child: const Icon(
-                      Icons.arrow_back_ios_new,
-                      size: 20,
-                      color: Colors.black87,
-                    ),
-                  ),
                   const SizedBox(width: 12),
                   Text(
                     widget.sessionName,

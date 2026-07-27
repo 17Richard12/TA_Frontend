@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'home_screen.dart';
 import 'chat_screen.dart';
-import 'record_screen.dart';
 import 'hospital_screen.dart';
 import 'history_screen.dart';
 import 'account_screen.dart';
@@ -38,9 +37,9 @@ class _MainScreenState extends State<MainScreen> {
     // Dibuild ulang setiap kali _name berubah
     // sehingga HomeScreen dan AccountScreen selalu dapat nama terbaru
     final screens = [
-      HomeScreen(name: _name),
+      HomeScreen(name: _name, userUid: widget.uid),
       ChatScreen(userUid: widget.uid),
-      const RecordScreen(),
+      //const RecordScreen(),
       const HospitalScreen(),
       HistoryScreen(userUid: widget.uid),
       AccountScreen(
@@ -76,11 +75,11 @@ class _MainScreenState extends State<MainScreen> {
             activeIcon: Icon(Icons.chat_bubble),
             label: 'Chat',
           ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.mic_none),
-            activeIcon: Icon(Icons.mic),
-            label: 'Record',
-          ),
+          // BottomNavigationBarItem(
+          //   icon: Icon(Icons.mic_none),
+          //   activeIcon: Icon(Icons.mic),
+          //   label: 'Record',
+          // ),
           BottomNavigationBarItem(
             icon: Icon(Icons.local_hospital_outlined),
             activeIcon: Icon(Icons.local_hospital),

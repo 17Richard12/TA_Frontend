@@ -2,13 +2,16 @@ import 'dart:math';
 import 'package:agent_doctor/services/news_service.dart';
 import 'package:agent_doctor/services/oxygen_service.dart';
 import 'package:agent_doctor/services/youtube_service.dart';
-import 'package:agent_doctor/services/songs_service.dart';
+import 'package:agent_doctor/services/smoke_service.dart';
+import 'package:agent_doctor/services/activity_service.dart';
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 class HomeScreen extends StatefulWidget {
   final String name;
-  const HomeScreen({super.key, required this.name});
+  final String userUid;
+
+  const HomeScreen({super.key, required this.name, required this.userUid});
 
   @override
   State<HomeScreen> createState() => _HomeScreenState();
@@ -16,38 +19,86 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   int _selectedTab = 0;
+
+  // State untuk Smoke
   int _smokeCount = 0;
+  bool _smokeLoading = true;
+
+  // State untuk Oxygen
   double _oxygenLevel = 0.0;
   bool _oxygenLoading = true;
 
+  Future<List<dynamic>>? _activitiesFuture;
   Future<List<dynamic>>? _newsFuture;
   Future<List<dynamic>>? _videoFuture;
-  Future<List<dynamic>>? _songsFuture;
 
   static const Color scaffoldBg = Colors.white;
   static const Color primaryDark = Color(0xFF1A1A8C);
   static const Color accentBlue = Color(0xFF29B6D8);
   static const Color textSub = Color(0xFF888888);
 
+  String get _todayTimestamp {
+    final now = DateTime.now();
+    return "${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}";
+  }
+
   @override
   void initState() {
     super.initState();
-    _newsFuture = NewsService.fetchTopHeadlines();
+    // Memuat Activities pertama kali karena index 0
+    _activitiesFuture = ActivityService.getActivities(
+      widget.userUid,
+      _todayTimestamp,
+    );
+
     _loadOxygenLevel();
+    _loadSmokeCount();
   }
 
   Future<void> _loadOxygenLevel() async {
     setState(() => _oxygenLoading = true);
     await OxygenService.requestPermission();
     final level = await OxygenService.getLatestOxygenLevel();
-    if (mounted)
+    if (mounted) {
       setState(() {
         _oxygenLevel = level;
         _oxygenLoading = false;
       });
+    }
   }
 
-  // Warna gauge berdasarkan nilai SpO2
+  Future<void> _loadSmokeCount() async {
+    setState(() => _smokeLoading = true);
+    final count = await SmokeService.getSmokeCount(
+      widget.userUid,
+      _todayTimestamp,
+    );
+    if (mounted) {
+      setState(() {
+        _smokeCount = count;
+        _smokeLoading = false;
+      });
+    }
+  }
+
+  Future<void> _updateSmokeCount(int newCount) async {
+    final oldCount = _smokeCount;
+    setState(() => _smokeCount = newCount);
+
+    final success = await SmokeService.postSmokeCount(
+      widget.userUid,
+      _todayTimestamp,
+      newCount,
+    );
+
+    if (!success && mounted) {
+      setState(() => _smokeCount = oldCount);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Gagal menyimpan jumlah rokok ke server')),
+      );
+    }
+  }
+
   Color _oxygenColor(double value) {
     if (value == 0) return Colors.grey.shade300;
     if (value >= 95) return const Color(0xFF2F60CC);
@@ -115,12 +166,11 @@ class _HomeScreenState extends State<HomeScreen> {
 
             const SizedBox(height: 20),
 
-            // SMOKE COUNT + OXYGEN LEVEL (side by side)
+            // SMOKE COUNT
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 20),
               child: Row(
                 children: [
-                  // Smoke Count
                   Expanded(
                     child: Container(
                       padding: const EdgeInsets.symmetric(vertical: 16),
@@ -146,133 +196,50 @@ class _HomeScreenState extends State<HomeScreen> {
                             ),
                           ),
                           const SizedBox(height: 12),
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              GestureDetector(
-                                onTap: () => setState(() {
-                                  if (_smokeCount > 0) _smokeCount--;
-                                }),
-                                child: _smallCircleButton(Icons.remove),
-                              ),
-                              const SizedBox(width: 16),
-                              Text(
-                                '$_smokeCount',
-                                style: const TextStyle(
-                                  fontSize: 36,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                              const SizedBox(width: 16),
-                              GestureDetector(
-                                onTap: () => setState(() => _smokeCount++),
-                                child: _smallCircleButton(Icons.add),
-                              ),
-                            ],
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-
-                  const SizedBox(width: 12),
-
-                  // Oxygen Level
-                  Expanded(
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(vertical: 16),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(20),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withOpacity(0.06),
-                            blurRadius: 10,
-                            offset: const Offset(0, 4),
-                          ),
-                        ],
-                      ),
-                      child: Column(
-                        children: [
-                          const Text(
-                            'Oxygen Level',
-                            style: TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.black87,
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                          _oxygenLoading
+                          _smokeLoading
                               ? const SizedBox(
-                                  height: 80,
+                                  height: 36,
                                   child: Center(
-                                    child: CircularProgressIndicator(
-                                      strokeWidth: 2,
+                                    child: SizedBox(
+                                      width: 20,
+                                      height: 20,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                      ),
                                     ),
                                   ),
                                 )
-                              : GestureDetector(
-                                  onTap: _loadOxygenLevel,
-                                  child: SizedBox(
-                                    height: 80,
-                                    child: CustomPaint(
-                                      painter: _OxygenGaugePainter(
-                                        value: _oxygenLevel,
-                                        color: _oxygenColor(_oxygenLevel),
-                                      ),
-                                      child: Center(
-                                        child: Padding(
-                                          padding: const EdgeInsets.only(
-                                            top: 32,
-                                          ),
-                                          child: Text(
-                                            _oxygenLevel == 0
-                                                ? '--'
-                                                : '\${_oxygenLevel.toStringAsFixed(0)}%',
-                                            style: TextStyle(
-                                              fontSize: 22,
-                                              fontWeight: FontWeight.bold,
-                                              color: _oxygenColor(_oxygenLevel),
-                                            ),
-                                          ),
-                                        ),
+                              : Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    GestureDetector(
+                                      onTap: () {
+                                        if (_smokeCount > 0)
+                                          _updateSmokeCount(_smokeCount - 1);
+                                      },
+                                      child: _smallCircleButton(Icons.remove),
+                                    ),
+                                    const SizedBox(width: 16),
+                                    Text(
+                                      '$_smokeCount',
+                                      style: const TextStyle(
+                                        fontSize: 36,
+                                        fontWeight: FontWeight.bold,
                                       ),
                                     ),
-                                  ),
+                                    const SizedBox(width: 16),
+                                    GestureDetector(
+                                      onTap: () =>
+                                          _updateSmokeCount(_smokeCount + 1),
+                                      child: _smallCircleButton(Icons.add),
+                                    ),
+                                  ],
                                 ),
-                          Text(
-                            _oxygenStatus(_oxygenLevel),
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: _oxygenColor(_oxygenLevel),
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                          if (_oxygenLevel == 0) ...[
-                            const SizedBox(height: 6),
-                            GestureDetector(
-                              onTap: () async {
-                                await OxygenService.openHealthConnectSettings();
-                                await Future.delayed(
-                                  const Duration(seconds: 2),
-                                );
-                                _loadOxygenLevel();
-                              },
-                              child: const Text(
-                                'Grant Permission',
-                                style: TextStyle(
-                                  fontSize: 11,
-                                  color: Color(0xFF2F60CC),
-                                  decoration: TextDecoration.underline,
-                                ),
-                              ),
-                            ),
-                          ],
                         ],
                       ),
                     ),
                   ),
+                  const SizedBox(width: 12),
                 ],
               ),
             ),
@@ -284,11 +251,11 @@ class _HomeScreenState extends State<HomeScreen> {
               padding: const EdgeInsets.symmetric(horizontal: 20),
               child: Row(
                 children: [
-                  _buildTab('News', 0),
+                  _buildTab('Activities', 0),
                   const SizedBox(width: 8),
-                  _buildTab('Videos', 1),
+                  _buildTab('News', 1),
                   const SizedBox(width: 8),
-                  _buildTab('Songs', 2),
+                  _buildTab('Videos', 2),
                 ],
               ),
             ),
@@ -298,10 +265,10 @@ class _HomeScreenState extends State<HomeScreen> {
             // CONTENT
             Expanded(
               child: _selectedTab == 0
-                  ? _buildNewsSection()
+                  ? _buildActivitiesSection()
                   : _selectedTab == 1
-                  ? _buildVideoSection()
-                  : _buildSongsSection(),
+                  ? _buildNewsSection()
+                  : _buildVideoSection(),
             ),
           ],
         ),
@@ -327,10 +294,18 @@ class _HomeScreenState extends State<HomeScreen> {
       onTap: () {
         setState(() {
           _selectedTab = index;
-          if (index == 1 && _videoFuture == null)
+          if (index == 0 && _activitiesFuture == null) {
+            _activitiesFuture = ActivityService.getActivities(
+              widget.userUid,
+              _todayTimestamp,
+            );
+          }
+          if (index == 1 && _newsFuture == null) {
+            _newsFuture = NewsService.fetchTopHeadlines();
+          }
+          if (index == 2 && _videoFuture == null) {
             _videoFuture = YouTubeService.fetchVideos();
-          if (index == 2 && _songsFuture == null)
-            _songsFuture = SongsService.fetchSongs();
+          }
         });
       },
       child: Container(
@@ -352,14 +327,99 @@ class _HomeScreenState extends State<HomeScreen> {
     await launchUrl(uri, mode: LaunchMode.externalApplication);
   }
 
+  // --- UI ACTIVITIES ---
+  Widget _buildActivitiesSection() {
+    if (_activitiesFuture == null)
+      return const Center(child: Text("Tap Activities to load data"));
+
+    return FutureBuilder<List<dynamic>>(
+      future: _activitiesFuture,
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        }
+        if (snapshot.hasError)
+          return Center(child: Text(snapshot.error.toString()));
+
+        final activityList = snapshot.data ?? [];
+
+        if (activityList.isEmpty) {
+          return const Center(child: Text("Belum ada aktivitas hari ini."));
+        }
+
+        return ListView.builder(
+          padding: const EdgeInsets.symmetric(horizontal: 20),
+          itemCount: activityList.length,
+          itemBuilder: (context, index) {
+            final activity = activityList[index];
+            final actText = activity['activity'] ?? 'Aktivitas';
+            final isDone = activity['done'] ?? false;
+
+            return Container(
+              margin: const EdgeInsets.only(bottom: 12),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(12),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.05),
+                    blurRadius: 6,
+                    offset: const Offset(0, 3),
+                  ),
+                ],
+              ),
+              child: ListTile(
+                leading: Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: isDone
+                        ? Colors.green.withOpacity(0.1)
+                        : accentBlue.withOpacity(0.1),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(
+                    isDone ? Icons.check_circle : Icons.local_activity,
+                    color: isDone ? Colors.green : accentBlue,
+                  ),
+                ),
+                title: Text(
+                  actText,
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    decoration: isDone ? TextDecoration.lineThrough : null,
+                  ),
+                ),
+                trailing: Checkbox(
+                  value: isDone,
+                  activeColor: Colors.green,
+                  onChanged: (bool? value) {
+                    // TODO: Jika Anda sudah membuat fungsi update status (done/not done) di backend
+                    // Silakan panggil fungsinya di sini.
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Fitur checklist akan segera tersedia!'),
+                      ),
+                    );
+                  },
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  // --- UI NEWS ---
   Widget _buildNewsSection() {
     if (_newsFuture == null)
       return const Center(child: Text("Tap News to load data"));
     return FutureBuilder<List<dynamic>>(
       future: _newsFuture,
       builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting)
+        if (snapshot.connectionState == ConnectionState.waiting) {
           return const Center(child: CircularProgressIndicator());
+        }
         if (snapshot.hasError)
           return Center(child: Text(snapshot.error.toString()));
         final newsList = snapshot.data ?? [];
@@ -424,14 +484,16 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  // --- UI VIDEOS ---
   Widget _buildVideoSection() {
     if (_videoFuture == null)
       return const Center(child: Text("Tap Videos to load data"));
     return FutureBuilder<List<dynamic>>(
       future: _videoFuture,
       builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting)
+        if (snapshot.connectionState == ConnectionState.waiting) {
           return const Center(child: CircularProgressIndicator());
+        }
         if (snapshot.hasError)
           return Center(child: Text(snapshot.error.toString()));
         final videoList = snapshot.data ?? [];
@@ -483,89 +545,6 @@ class _HomeScreenState extends State<HomeScreen> {
                     Text(
                       snippet['channelTitle'] ?? '',
                       style: const TextStyle(fontSize: 12, color: Colors.grey),
-                    ),
-                  ],
-                ),
-              ),
-            );
-          },
-        );
-      },
-    );
-  }
-
-  Widget _buildSongsSection() {
-    if (_songsFuture == null)
-      return const Center(child: Text("Tap Songs to load data"));
-    return FutureBuilder<List<dynamic>>(
-      future: _songsFuture,
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting)
-          return const Center(child: CircularProgressIndicator());
-        if (snapshot.hasError)
-          return Center(child: Text(snapshot.error.toString()));
-        final songsList = snapshot.data ?? [];
-        return ListView.builder(
-          padding: const EdgeInsets.symmetric(horizontal: 20),
-          itemCount: songsList.length,
-          itemBuilder: (context, index) {
-            final song = songsList[index];
-            return GestureDetector(
-              onTap: () {
-                if (song['previewUrl'] != null) _openUrl(song['previewUrl']);
-              },
-              child: Container(
-                margin: const EdgeInsets.only(bottom: 16),
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(12),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withOpacity(0.05),
-                      blurRadius: 6,
-                      offset: const Offset(0, 3),
-                    ),
-                  ],
-                ),
-                child: Row(
-                  children: [
-                    if (song['artworkUrl100'] != null)
-                      ClipRRect(
-                        borderRadius: BorderRadius.circular(8),
-                        child: Image.network(
-                          song['artworkUrl100'],
-                          width: 60,
-                          height: 60,
-                          fit: BoxFit.cover,
-                        ),
-                      ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            song['trackName'] ?? '',
-                            style: const TextStyle(
-                              fontWeight: FontWeight.bold,
-                              fontSize: 14,
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            song['artistName'] ?? '',
-                            style: const TextStyle(
-                              fontSize: 12,
-                              color: Colors.grey,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const Icon(
-                      Icons.play_circle_fill,
-                      color: Colors.deepPurple,
                     ),
                   ],
                 ),
