@@ -1,6 +1,7 @@
 import 'package:agent_doctor/screens/login_screen.dart';
 import 'package:agent_doctor/screens/main_screen.dart';
 import 'package:agent_doctor/services/auth_service.dart';
+import 'package:agent_doctor/services/session_service.dart';
 import 'package:flutter/material.dart';
 
 class RegisterScreen extends StatefulWidget {
@@ -207,6 +208,11 @@ class _RegisterScreenState extends State<RegisterScreen> {
                                             );
                                         if (mounted) {
                                           if (result['status'] == 'success') {
+                                            // Simpan sesi login
+                                            await SessionService.saveSession(
+                                              result['uid'],
+                                              result['data']['name'],
+                                            );
                                             // Langsung masuk ke MainScreen setelah register
                                             Navigator.pushReplacement(
                                               context,

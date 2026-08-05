@@ -1,6 +1,7 @@
 import 'package:agent_doctor/screens/edit_screen.dart';
 import 'package:agent_doctor/screens/password_screen.dart';
 import 'package:agent_doctor/services/auth_service.dart';
+import 'package:agent_doctor/services/session_service.dart';
 import 'package:flutter/material.dart';
 
 class AccountScreen extends StatefulWidget {
@@ -105,11 +106,12 @@ class _AccountScreenState extends State<AccountScreen> {
                                 ),
                               ),
                             );
-                        // Update nama jika ada perubahan
                         if (updatedData != null &&
                             updatedData['name'] != null) {
                           final newName = updatedData['name'] as String;
                           setState(() => _name = newName);
+                          // Update name in session
+                          await SessionService.updateName(newName);
                           widget.onNameUpdated?.call(
                             newName,
                           ); // propagate ke MainScreen
@@ -203,9 +205,12 @@ class _AccountScreenState extends State<AccountScreen> {
             child: const Text('Cancel', style: TextStyle(color: Colors.grey)),
           ),
           ElevatedButton(
-            onPressed: () {
-              Navigator.pop(ctx);
-              Navigator.of(context).popUntil((route) => route.isFirst);
+            onPressed: () async {
+              await SessionService.clearSession();
+              if (context.mounted) {
+                Navigator.pop(ctx);
+                Navigator.of(context).popUntil((route) => route.isFirst);
+              }
             },
             style: ElevatedButton.styleFrom(
               backgroundColor: primaryBlue,

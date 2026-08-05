@@ -28,7 +28,12 @@ class _HomeScreenState extends State<HomeScreen> {
   double _oxygenLevel = 0.0;
   bool _oxygenLoading = true;
 
-  Future<List<dynamic>>? _activitiesFuture;
+  // State untuk Activities (Diubah dari FutureBuilder ke local state agar mendukung UI real-time)
+  bool _activitiesLoading = true;
+  String? _dailyActivityId;
+  List<dynamic> _activityList = [];
+
+  // Future untuk News dan Video
   Future<List<dynamic>>? _newsFuture;
   Future<List<dynamic>>? _videoFuture;
 
@@ -45,16 +50,66 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
-    // Memuat Activities pertama kali karena index 0
-    _activitiesFuture = ActivityService.getActivities(
-      widget.userUid,
-      _todayTimestamp,
-    );
-
+    _loadActivities(); // Load Activities pertama kali
     _loadOxygenLevel();
     _loadSmokeCount();
   }
 
+  // --- FETCH DATA ACTIVITIES ---
+  Future<void> _loadActivities() async {
+    setState(() => _activitiesLoading = true);
+    final data = await ActivityService.getDailyActivity(
+      widget.userUid,
+      _todayTimestamp,
+    );
+
+    if (mounted) {
+      setState(() {
+        if (data != null) {
+          _dailyActivityId = data['id'];
+          _activityList = data['activities'] ?? [];
+        }
+        _activitiesLoading = false;
+      });
+    }
+  }
+
+  // --- FUNGSI UPDATE CHECKLIST (OPTIMISTIC UI) ---
+  Future<void> _toggleActivityChecklist(int index) async {
+    if (_dailyActivityId == null) return;
+
+    final activity = _activityList[index];
+    final activityId = activity['id'];
+    final currentStatus = activity['done'] ?? false;
+    final newStatus = !currentStatus;
+
+    // 1. Optimistic UI Update: Ubah UI duluan agar terasa cepat
+    setState(() {
+      _activityList[index]['done'] = newStatus;
+    });
+
+    // 2. Kirim request ke backend
+    final success = await ActivityService.updateActivityChecklist(
+      _dailyActivityId!,
+      activityId,
+      newStatus,
+    );
+
+    // 3. Jika gagal, kembalikan ke status awal dan tampilkan error
+    if (!success && mounted) {
+      setState(() {
+        _activityList[index]['done'] = currentStatus;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Gagal memperbarui status aktivitas'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+
+  // --- FUNGSI SMOKE & OXYGEN ---
   Future<void> _loadOxygenLevel() async {
     setState(() => _oxygenLoading = true);
     await OxygenService.requestPermission();
@@ -214,8 +269,9 @@ class _HomeScreenState extends State<HomeScreen> {
                                   children: [
                                     GestureDetector(
                                       onTap: () {
-                                        if (_smokeCount > 0)
+                                        if (_smokeCount > 0) {
                                           _updateSmokeCount(_smokeCount - 1);
+                                        }
                                       },
                                       child: _smallCircleButton(Icons.remove),
                                     ),
@@ -294,11 +350,8 @@ class _HomeScreenState extends State<HomeScreen> {
       onTap: () {
         setState(() {
           _selectedTab = index;
-          if (index == 0 && _activitiesFuture == null) {
-            _activitiesFuture = ActivityService.getActivities(
-              widget.userUid,
-              _todayTimestamp,
-            );
+          if (index == 0 && _activityList.isEmpty && !_activitiesLoading) {
+            _loadActivities();
           }
           if (index == 1 && _newsFuture == null) {
             _newsFuture = NewsService.fetchTopHeadlines();
@@ -329,82 +382,65 @@ class _HomeScreenState extends State<HomeScreen> {
 
   // --- UI ACTIVITIES ---
   Widget _buildActivitiesSection() {
-    if (_activitiesFuture == null)
-      return const Center(child: Text("Tap Activities to load data"));
+    if (_activitiesLoading) {
+      return const Center(child: CircularProgressIndicator());
+    }
 
-    return FutureBuilder<List<dynamic>>(
-      future: _activitiesFuture,
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Center(child: CircularProgressIndicator());
-        }
-        if (snapshot.hasError)
-          return Center(child: Text(snapshot.error.toString()));
+    if (_activityList.isEmpty) {
+      return const Center(child: Text("Belum ada aktivitas hari ini."));
+    }
 
-        final activityList = snapshot.data ?? [];
+    return ListView.builder(
+      padding: const EdgeInsets.symmetric(horizontal: 20),
+      itemCount: _activityList.length,
+      itemBuilder: (context, index) {
+        final activity = _activityList[index];
+        final actText = activity['activity'] ?? 'Aktivitas';
+        final isDone = activity['done'] ?? false;
 
-        if (activityList.isEmpty) {
-          return const Center(child: Text("Belum ada aktivitas hari ini."));
-        }
-
-        return ListView.builder(
-          padding: const EdgeInsets.symmetric(horizontal: 20),
-          itemCount: activityList.length,
-          itemBuilder: (context, index) {
-            final activity = activityList[index];
-            final actText = activity['activity'] ?? 'Aktivitas';
-            final isDone = activity['done'] ?? false;
-
-            return Container(
-              margin: const EdgeInsets.only(bottom: 12),
+        return Container(
+          margin: const EdgeInsets.only(bottom: 12),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(12),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.05),
+                blurRadius: 6,
+                offset: const Offset(0, 3),
+              ),
+            ],
+          ),
+          child: ListTile(
+            leading: Container(
+              padding: const EdgeInsets.all(10),
               decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(12),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.05),
-                    blurRadius: 6,
-                    offset: const Offset(0, 3),
-                  ),
-                ],
+                color: isDone
+                    ? Colors.green.withOpacity(0.1)
+                    : accentBlue.withOpacity(0.1),
+                shape: BoxShape.circle,
               ),
-              child: ListTile(
-                leading: Container(
-                  padding: const EdgeInsets.all(10),
-                  decoration: BoxDecoration(
-                    color: isDone
-                        ? Colors.green.withOpacity(0.1)
-                        : accentBlue.withOpacity(0.1),
-                    shape: BoxShape.circle,
-                  ),
-                  child: Icon(
-                    isDone ? Icons.check_circle : Icons.local_activity,
-                    color: isDone ? Colors.green : accentBlue,
-                  ),
-                ),
-                title: Text(
-                  actText,
-                  style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    decoration: isDone ? TextDecoration.lineThrough : null,
-                  ),
-                ),
-                trailing: Checkbox(
-                  value: isDone,
-                  activeColor: Colors.green,
-                  onChanged: (bool? value) {
-                    // TODO: Jika Anda sudah membuat fungsi update status (done/not done) di backend
-                    // Silakan panggil fungsinya di sini.
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('Fitur checklist akan segera tersedia!'),
-                      ),
-                    );
-                  },
-                ),
+              child: Icon(
+                isDone ? Icons.check_circle : Icons.local_activity,
+                color: isDone ? Colors.green : accentBlue,
               ),
-            );
-          },
+            ),
+            title: Text(
+              actText,
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                decoration: isDone ? TextDecoration.lineThrough : null,
+              ),
+            ),
+            trailing: Checkbox(
+              value: isDone,
+              activeColor: Colors.green,
+              onChanged: (bool? value) {
+                // Panggil fungsi toggle yang akan mengurus UI & Request Backend
+                _toggleActivityChecklist(index);
+              },
+            ),
+          ),
         );
       },
     );
@@ -414,14 +450,17 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget _buildNewsSection() {
     if (_newsFuture == null)
       return const Center(child: Text("Tap News to load data"));
+
     return FutureBuilder<List<dynamic>>(
       future: _newsFuture,
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Center(child: CircularProgressIndicator());
         }
-        if (snapshot.hasError)
+        if (snapshot.hasError) {
           return Center(child: Text(snapshot.error.toString()));
+        }
+
         final newsList = snapshot.data ?? [];
         return ListView.builder(
           padding: const EdgeInsets.symmetric(horizontal: 20),
@@ -488,14 +527,17 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget _buildVideoSection() {
     if (_videoFuture == null)
       return const Center(child: Text("Tap Videos to load data"));
+
     return FutureBuilder<List<dynamic>>(
       future: _videoFuture,
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Center(child: CircularProgressIndicator());
         }
-        if (snapshot.hasError)
+        if (snapshot.hasError) {
           return Center(child: Text(snapshot.error.toString()));
+        }
+
         final videoList = snapshot.data ?? [];
         return ListView.builder(
           padding: const EdgeInsets.symmetric(horizontal: 20),

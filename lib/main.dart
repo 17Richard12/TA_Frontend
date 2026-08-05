@@ -1,5 +1,7 @@
 import 'package:agent_doctor/firebase_options.dart';
 import 'package:agent_doctor/screens/auth_screen.dart';
+import 'package:agent_doctor/screens/main_screen.dart';
+import 'package:agent_doctor/services/session_service.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 
@@ -8,11 +10,22 @@ void main() async {
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
-  runApp(const MyApp());
+  // Check session
+  final uid = await SessionService.getUid();
+  final name = await SessionService.getName();
+  
+  Widget initialScreen = AuthScreen();
+  if (uid != null && name != null) {
+    initialScreen = MainScreen(uid: uid, name: name);
+  }
+
+  runApp(MyApp(initialScreen: initialScreen));
 }
 
 class MyApp extends StatelessWidget {
-  const MyApp({super.key});
+  final Widget initialScreen;
+
+  const MyApp({super.key, required this.initialScreen});
 
   @override
   Widget build(BuildContext context) {
@@ -22,7 +35,7 @@ class MyApp extends StatelessWidget {
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
         useMaterial3: true,
       ),
-      home: AuthScreen(),
+      home: initialScreen,
     );
   }
 }

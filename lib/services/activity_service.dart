@@ -1,34 +1,71 @@
 import 'dart:convert';
-import 'package:http/http.dart' as http;
 import 'package:agent_doctor/constants.dart';
-import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
 
 class ActivityService {
-  // Menggunakan POST karena backend menerima payload (GenerateActivitySchema)
-  static Future<List<dynamic>> getActivities(
+  // TODO: Sesuaikan dengan URL backend kamu.
+  // Jika menggunakan emulator Android, gunakan http://10.0.2.2:8000
+  // Jika real device/hosting, gunakan IP/Domain yang sesuai.
+  static const String baseUrl = '${AppConstants.baseUrl}/api/activities';
+
+  /// Fetch data dari endpoint POST /activities/process
+  /// Mengembalikan Map penuh agar kita bisa mendapatkan root 'id' (dailyActivityId)
+  static Future<Map<String, dynamic>?> getDailyActivity(
     String userUid,
     String timestamp,
   ) async {
+    final url = Uri.parse('$baseUrl/process');
+
     try {
       final response = await http.post(
-        Uri.parse(
-          '${AppConstants.baseUrl}/api/activities/process',
-        ), // Sesuaikan path jika berbeda
-        headers: {"Content-Type": "application/json"},
-        body: jsonEncode({"user_uid": userUid, "timestamp": timestamp}),
+        url,
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({'user_uid': userUid, 'timestamp': timestamp}),
       );
 
-      if (response.statusCode == 200 || response.statusCode == 201) {
+      if (response.statusCode == 200) {
         final jsonResponse = jsonDecode(response.body);
         if (jsonResponse['status'] == 'success') {
-          // Mengambil array "activities" dari dalam "data"
-          return jsonResponse['data']['activities'] ?? [];
+          // Mengembalikan objek data yang berisi {id, user_uid, timestamp, activities: [...]}
+          return jsonResponse['data'];
         }
       }
-      return [];
+      print('Gagal load activities: ${response.body}');
+      return null;
     } catch (e) {
-      debugPrint("Error fetching activities: $e");
-      return [];
+      print('Error getDailyActivity: $e');
+      return null;
+    }
+  }
+
+  /// Update status checklist via PATCH /activities/{daily_id}/items/{act_id}/check
+  static Future<bool> updateActivityChecklist(
+    String dailyActivityId,
+    String activityId,
+    bool isDone,
+  ) async {
+    final url = Uri.parse(
+      '$baseUrl/$dailyActivityId/items/$activityId/check',
+    );
+
+    try {
+      final response = await http.patch(
+        url,
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({'done': isDone}),
+      );
+
+      if (response.statusCode == 200) {
+        return true;
+      } else {
+        print(
+          'Gagal update checklist: ${response.statusCode} - ${response.body}',
+        );
+        return false;
+      }
+    } catch (e) {
+      print('Error update checklist: $e');
+      return false;
     }
   }
 }

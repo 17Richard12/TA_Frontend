@@ -10,7 +10,7 @@ class YouTubeService {
       Uri.parse(
         'https://www.googleapis.com/youtube/v3/search'
         '?part=snippet'
-        '&q=health'
+        '&q=lungs health'
         '&type=video'
         '&maxResults=50'
         '&key=$_apiKey',
