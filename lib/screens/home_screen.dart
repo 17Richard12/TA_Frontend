@@ -488,16 +488,39 @@ class _HomeScreenState extends State<HomeScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    if (article['urlToImage'] != null)
-                      ClipRRect(
-                        borderRadius: BorderRadius.circular(8),
-                        child: Image.network(
-                          article['urlToImage'],
-                          height: 160,
-                          width: double.infinity,
-                          fit: BoxFit.cover,
-                        ),
-                      ),
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(8),
+                      child: article['urlToImage'] != null &&
+                              article['urlToImage'].toString().isNotEmpty
+                          ? Image.network(
+                              article['urlToImage'],
+                              height: 160,
+                              width: double.infinity,
+                              fit: BoxFit.cover,
+                              errorBuilder: (context, error, stackTrace) {
+                                return Container(
+                                  height: 160,
+                                  width: double.infinity,
+                                  color: Colors.grey.shade200,
+                                  child: const Icon(
+                                    Icons.broken_image,
+                                    color: Colors.grey,
+                                    size: 50,
+                                  ),
+                                );
+                              },
+                            )
+                          : Container(
+                              height: 160,
+                              width: double.infinity,
+                              color: Colors.grey.shade200,
+                              child: const Icon(
+                                Icons.image_not_supported,
+                                color: Colors.grey,
+                                size: 50,
+                              ),
+                            ),
+                    ),
                     const SizedBox(height: 8),
                     Text(
                       article['title'] ?? '',

@@ -1,3 +1,4 @@
+import 'package:agent_doctor/screens/auth_screen.dart';
 import 'package:agent_doctor/screens/edit_screen.dart';
 import 'package:agent_doctor/screens/password_screen.dart';
 import 'package:agent_doctor/services/auth_service.dart';
@@ -208,8 +209,11 @@ class _AccountScreenState extends State<AccountScreen> {
             onPressed: () async {
               await SessionService.clearSession();
               if (context.mounted) {
-                Navigator.pop(ctx);
-                Navigator.of(context).popUntil((route) => route.isFirst);
+                Navigator.pop(ctx); // Close dialog
+                Navigator.of(context).pushAndRemoveUntil(
+                  MaterialPageRoute(builder: (context) => AuthScreen()),
+                  (Route<dynamic> route) => false,
+                );
               }
             },
             style: ElevatedButton.styleFrom(
