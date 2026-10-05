@@ -1,3 +1,4 @@
+import 'package:agent_doctor/screens/mri_screen.dart';
 import 'package:agent_doctor/screens/auth_screen.dart';
 import 'package:agent_doctor/screens/edit_screen.dart';
 import 'package:agent_doctor/screens/password_screen.dart';
@@ -87,6 +88,21 @@ class _AccountScreenState extends State<AccountScreen> {
 
                   const SizedBox(height: 14),
 
+                  // Perbandingan MRI
+                  _buildButton(
+                    label: 'Perbandingan MRI',
+                    onPressed: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => MriScreen(userUid: widget.uid),
+                        ),
+                      );
+                    },
+                  ),
+
+                  const SizedBox(height: 14),
+
                   // Edit Profile
                   _buildButton(
                     label: 'Edit Profile',
@@ -104,6 +120,7 @@ class _AccountScreenState extends State<AccountScreen> {
                                 builder: (_) => EditProfileScreen(
                                   uid: widget.uid,
                                   userData: result['data'],
+                                  currentUserRole: result['data']['role'],
                                 ),
                               ),
                             );

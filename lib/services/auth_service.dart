@@ -176,4 +176,38 @@ class AuthService {
         return 'Error $statusCode: $message';
     }
   }
+
+  Future<Map<String, dynamic>> getAllUsers() async {
+    try {
+      final response = await _dio.get('/api/users/');
+
+      final data = response.data;
+      if (data['status'] == 'success') {
+        return {'status': 'success', 'data': data['data']};
+      } else {
+        return {'status': 'error', 'message': data['message']};
+      }
+    } on DioException catch (e) {
+      return {'status': 'error', 'message': _handleDioError(e)};
+    } catch (e) {
+      return {'status': 'error', 'message': 'Unexpected error: $e'};
+    }
+  }
+
+  Future<Map<String, dynamic>> getPatients() async {
+    try {
+      final response = await _dio.get('/api/users/patients');
+
+      final data = response.data;
+      if (data['status'] == 'success') {
+        return {'status': 'success', 'data': data['data']};
+      } else {
+        return {'status': 'error', 'message': data['message']};
+      }
+    } on DioException catch (e) {
+      return {'status': 'error', 'message': _handleDioError(e)};
+    } catch (e) {
+      return {'status': 'error', 'message': 'Unexpected error: $e'};
+    }
+  }
 }

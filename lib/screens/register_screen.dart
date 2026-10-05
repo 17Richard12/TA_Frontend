@@ -212,6 +212,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                                             await SessionService.saveSession(
                                               result['uid'],
                                               result['data']['name'],
+                                              result['data']['role'],
                                             );
                                             // Langsung masuk ke MainScreen setelah register
                                             Navigator.pushReplacement(
@@ -220,6 +221,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                                                 builder: (context) => MainScreen(
                                                   uid: result['uid'],
                                                   name: result['data']['name'],
+                                                  role: result['data']['role'],
                                                 ),
                                               ),
                                             );

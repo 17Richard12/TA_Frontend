@@ -6,6 +6,7 @@ import 'package:agent_doctor/services/smoke_service.dart';
 import 'package:agent_doctor/services/activity_service.dart';
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:fl_chart/fl_chart.dart';
 
 class HomeScreen extends StatefulWidget {
   final String name;
@@ -24,9 +25,20 @@ class _HomeScreenState extends State<HomeScreen> {
   int _smokeCount = 0;
   bool _smokeLoading = true;
 
+  // State untuk Smoke Report (Grafik)
+  List<dynamic> _weeklySmokeReport = [];
+  bool _reportLoading = true;
+
+  // State untuk Activity Report (Grafik Kanan)
+  List<dynamic> _weeklyActivityReport = [];
+  bool _activityReportLoading = true;
+
   // State untuk Oxygen
   double _oxygenLevel = 0.0;
   bool _oxygenLoading = true;
+
+  int _currentStreak = 0;
+  bool _streakLoading = true;
 
   // State untuk Activities (Diubah dari FutureBuilder ke local state agar mendukung UI real-time)
   bool _activitiesLoading = true;
@@ -40,11 +52,17 @@ class _HomeScreenState extends State<HomeScreen> {
   static const Color scaffoldBg = Colors.white;
   static const Color primaryDark = Color(0xFF1A1A8C);
   static const Color accentBlue = Color(0xFF29B6D8);
+  static const Color accentGreen = Colors.green;
   static const Color textSub = Color(0xFF888888);
 
   String get _todayTimestamp {
     final now = DateTime.now();
     return "${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}";
+  }
+
+  String get _todayTimestampForReport {
+    final now = DateTime.now();
+    return "${now.day.toString().padLeft(2, '0')}/${now.month.toString().padLeft(2, '0')}/${now.year}";
   }
 
   @override
@@ -53,6 +71,9 @@ class _HomeScreenState extends State<HomeScreen> {
     _loadActivities(); // Load Activities pertama kali
     _loadOxygenLevel();
     _loadSmokeCount();
+    _loadWeeklyReport();
+    _loadWeeklyActivityReport();
+    _loadStreak();
   }
 
   // --- FETCH DATA ACTIVITIES ---
@@ -70,6 +91,48 @@ class _HomeScreenState extends State<HomeScreen> {
           _activityList = data['activities'] ?? [];
         }
         _activitiesLoading = false;
+      });
+    }
+  }
+
+  Future<void> _loadStreak() async {
+    setState(() => _streakLoading = true);
+    final streak = await ActivityService.getActivityStreak(
+      widget.userUid,
+      _todayTimestampForReport,
+    );
+    if (mounted) {
+      setState(() {
+        _currentStreak = streak;
+        _streakLoading = false;
+      });
+    }
+  }
+
+  Future<void> _loadWeeklyReport() async {
+    setState(() => _reportLoading = true);
+    final report = await SmokeService.getWeeklyReport(
+      widget.userUid,
+      _todayTimestampForReport,
+    );
+    if (mounted) {
+      setState(() {
+        _weeklySmokeReport = report;
+        _reportLoading = false;
+      });
+    }
+  }
+
+  Future<void> _loadWeeklyActivityReport() async {
+    setState(() => _activityReportLoading = true);
+    final report = await ActivityService.getWeeklyActivityReport(
+      widget.userUid,
+      _todayTimestampForReport,
+    );
+    if (mounted) {
+      setState(() {
+        _weeklyActivityReport = report;
+        _activityReportLoading = false;
       });
     }
   }
@@ -106,6 +169,10 @@ class _HomeScreenState extends State<HomeScreen> {
           backgroundColor: Colors.red,
         ),
       );
+    } else {
+      // Jika berhasil, refresh grafik aktivitas DAN hitungan streak
+      _loadWeeklyActivityReport();
+      _loadStreak();
     }
   }
 
@@ -151,6 +218,8 @@ class _HomeScreenState extends State<HomeScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Gagal menyimpan jumlah rokok ke server')),
       );
+    } else {
+      _loadWeeklyReport();
     }
   }
 
@@ -168,6 +237,318 @@ class _HomeScreenState extends State<HomeScreen> {
     return 'Berbahaya';
   }
 
+  // --- GRAFIK GABUNGAN: SMOKE & ACTIVITY ---
+  Widget _buildCombinedChart() {
+    // Tunggu sampai kedua API selesai
+    if (_reportLoading || _activityReportLoading) {
+      return const Padding(
+        padding: EdgeInsets.all(20.0),
+        child: Center(child: CircularProgressIndicator()),
+      );
+    }
+
+    if (_weeklySmokeReport.isEmpty || _weeklyActivityReport.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    List<BarChartGroupData> barGroups = [];
+    // Asumsi kedua data selalu memiliki panjang 7 (7 hari terakhir)
+    for (int i = 0; i < 7; i++) {
+      final double smokeCount = (_weeklySmokeReport[i]['count'] as num)
+          .toDouble();
+      final double activityCount = (_weeklyActivityReport[i]['count'] as num)
+          .toDouble();
+
+      barGroups.add(
+        BarChartGroupData(
+          x: i,
+          barsSpace: 4, // Jarak antara batang biru dan hijau
+          barRods: [
+            // Bar Rokok (Biru)
+            BarChartRodData(
+              toY: smokeCount,
+              color: accentBlue,
+              width: 10,
+              borderRadius: BorderRadius.circular(4),
+              backDrawRodData: BackgroundBarChartRodData(
+                show: true,
+                toY: 20, // Batas background abu-abu
+                color: Colors.grey.shade100,
+              ),
+            ),
+            // Bar Aktivitas (Hijau)
+            BarChartRodData(
+              toY: activityCount,
+              color: accentGreen,
+              width: 10,
+              borderRadius: BorderRadius.circular(4),
+              backDrawRodData: BackgroundBarChartRodData(
+                show: true,
+                toY: 20,
+                color: Colors.grey.shade100,
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 20),
+      padding: const EdgeInsets.all(16),
+      height: 175, // Sedikit ditinggikan agar legenda muat
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.06),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Header & Legenda
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text(
+                'Weekly Summary',
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.black87,
+                ),
+              ),
+              Row(
+                children: [
+                  _buildLegend(accentBlue, 'Smoke'),
+                  const SizedBox(width: 12),
+                  _buildLegend(accentGreen, 'Activities'),
+                ],
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Expanded(
+            child: BarChart(
+              BarChartData(
+                alignment: BarChartAlignment.spaceAround,
+                maxY: 20,
+                barTouchData: BarTouchData(
+                  enabled: true,
+                  touchTooltipData: BarTouchTooltipData(
+                    getTooltipItem: (group, groupIndex, rod, rodIndex) {
+                      String label = rodIndex == 0 ? 'Rokok' : 'Aktivitas';
+                      return BarTooltipItem(
+                        '${rod.toY.toInt()} $label',
+                        const TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 12,
+                        ),
+                      );
+                    },
+                  ),
+                ),
+                titlesData: FlTitlesData(
+                  show: true,
+                  bottomTitles: AxisTitles(
+                    sideTitles: SideTitles(
+                      showTitles: true,
+                      getTitlesWidget: (double value, TitleMeta meta) {
+                        int index = value.toInt();
+                        if (index >= 0 && index < _weeklySmokeReport.length) {
+                          String date = _weeklySmokeReport[index]['timestamp'];
+                          String dayMonth = date.substring(0, 5);
+                          return Padding(
+                            padding: const EdgeInsets.only(top: 8.0),
+                            child: Text(
+                              dayMonth,
+                              style: const TextStyle(
+                                fontSize: 10,
+                                color: textSub,
+                              ),
+                            ),
+                          );
+                        }
+                        return const Text('');
+                      },
+                    ),
+                  ),
+                  leftTitles: const AxisTitles(
+                    sideTitles: SideTitles(showTitles: false),
+                  ),
+                  topTitles: const AxisTitles(
+                    sideTitles: SideTitles(showTitles: false),
+                  ),
+                  rightTitles: const AxisTitles(
+                    sideTitles: SideTitles(showTitles: false),
+                  ),
+                ),
+                borderData: FlBorderData(show: false),
+                gridData: const FlGridData(show: false),
+                barGroups: barGroups,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // Widget Bantuan untuk menampilkan Legenda Warna
+  Widget _buildLegend(Color color, String text) {
+    return Row(
+      children: [
+        Container(
+          width: 10,
+          height: 10,
+          decoration: BoxDecoration(shape: BoxShape.circle, color: color),
+        ),
+        const SizedBox(width: 4),
+        Text(
+          text,
+          style: const TextStyle(
+            fontSize: 10,
+            color: textSub,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildStreakCard() {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 20),
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white, // Menyamakan dengan tema card lain
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.06),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (_streakLoading)
+            const SizedBox(
+              height: 50,
+              child: Center(
+                child: CircularProgressIndicator(color: accentBlue),
+              ),
+            )
+          else ...[
+            Text(
+              '$_currentStreak',
+              style: const TextStyle(
+                fontSize: 32,
+                fontWeight: FontWeight.bold,
+                color: Colors.black87, // Warna teks diubah ke gelap
+              ),
+            ),
+            const Text(
+              'Current streak',
+              style: TextStyle(
+                fontSize: 14,
+                color: textSub, // Menggunakan warna abu-abu tema
+              ),
+            ),
+          ],
+          const SizedBox(height: 10),
+
+          // Days timeline
+          if (!_activityReportLoading && _weeklyActivityReport.isNotEmpty)
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: List.generate(_weeklyActivityReport.length, (index) {
+                final data = _weeklyActivityReport[index];
+                final bool isDone = (data['count'] as num) > 0;
+                final bool isToday = index == _weeklyActivityReport.length - 1;
+
+                final parts = data['timestamp'].split('/');
+                final date = DateTime(
+                  int.parse(parts[2]),
+                  int.parse(parts[1]),
+                  int.parse(parts[0]),
+                );
+                final weekdays = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
+                final weekdayLetter = weekdays[date.weekday - 1];
+
+                return Column(
+                  children: [
+                    if (isToday && !isDone)
+                      const Icon(
+                        Icons.arrow_drop_down,
+                        color: accentBlue, // Menyesuaikan warna panah
+                        size: 24,
+                      )
+                    else
+                      const SizedBox(height: 10),
+
+                    isToday && !isDone
+                        ? CustomPaint(
+                            painter: _DashedCirclePainter(
+                              color: accentBlue,
+                            ), // Garis putus-putus
+                            child: const SizedBox(width: 36, height: 36),
+                          )
+                        : Container(
+                            width: 36,
+                            height: 36,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: isDone
+                                  ? accentBlue
+                                  : Colors.transparent, // Warna lingkaran aktif
+                              border: isDone
+                                  ? null
+                                  : Border.all(
+                                      color: Colors.grey.shade300,
+                                      width: 2,
+                                    ), // Warna lingkaran kosong
+                            ),
+                            child: isDone
+                                ? const Icon(
+                                    Icons.whatshot,
+                                    color: Colors.white, // Ikon api putih
+                                    size: 20,
+                                  )
+                                : null,
+                          ),
+                    const SizedBox(height: 10),
+                    Text(
+                      weekdayLetter,
+                      style: TextStyle(
+                        color: isToday
+                            ? Colors.black87
+                            : Colors.grey, // Teks hari
+                        fontWeight: isToday
+                            ? FontWeight.bold
+                            : FontWeight.normal,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ],
+                );
+              }),
+            )
+          else
+            const Center(child: CircularProgressIndicator(color: accentBlue)),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -175,7 +556,6 @@ class _HomeScreenState extends State<HomeScreen> {
       body: SafeArea(
         child: Column(
           children: [
-            // HEADER
             Container(
               width: double.infinity,
               decoration: const BoxDecoration(
@@ -218,113 +598,163 @@ class _HomeScreenState extends State<HomeScreen> {
                 ],
               ),
             ),
+            Expanded(
+              child: SingleChildScrollView(
+                child: Column(
+                  children: [
+                    const SizedBox(height: 10),
 
-            const SizedBox(height: 20),
-
-            // SMOKE COUNT
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(vertical: 16),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(20),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withOpacity(0.06),
-                            blurRadius: 10,
-                            offset: const Offset(0, 4),
-                          ),
-                        ],
-                      ),
-                      child: Column(
-                        children: [
-                          const Text(
-                            'Smoke Count',
-                            style: TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.black87,
+                    // SMOKE COUNT
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 20),
+                      child: Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(20),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.06),
+                              blurRadius: 10,
+                              offset: const Offset(0, 4),
                             ),
-                          ),
-                          const SizedBox(height: 12),
-                          _smokeLoading
-                              ? const SizedBox(
-                                  height: 36,
-                                  child: Center(
-                                    child: SizedBox(
-                                      width: 20,
-                                      height: 20,
-                                      child: CircularProgressIndicator(
-                                        strokeWidth: 2,
+                          ],
+                        ),
+                        child: Column(
+                          children: [
+                            const Text(
+                              'Smoke Count',
+                              style: TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.black87,
+                              ),
+                            ),
+                            const SizedBox(height: 12),
+                            _smokeLoading
+                                ? const SizedBox(
+                                    height: 36,
+                                    child: Center(
+                                      child: SizedBox(
+                                        width: 20,
+                                        height: 20,
+                                        child: CircularProgressIndicator(
+                                          strokeWidth: 2,
+                                        ),
                                       ),
                                     ),
+                                  )
+                                : Row(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      GestureDetector(
+                                        onTap: () {
+                                          if (_smokeCount > 0) {
+                                            _updateSmokeCount(_smokeCount - 1);
+                                          }
+                                        },
+                                        child: _smallCircleButton(Icons.remove),
+                                      ),
+                                      const SizedBox(width: 16),
+                                      Text(
+                                        '$_smokeCount',
+                                        style: const TextStyle(
+                                          fontSize: 36,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                      const SizedBox(width: 16),
+                                      GestureDetector(
+                                        onTap: () {
+                                          // 1. Hapus snackbar sebelumnya (jika user tap berkali-kali dengan cepat)
+                                          ScaffoldMessenger.of(
+                                            context,
+                                          ).clearSnackBars();
+
+                                          // 2. Tampilkan warning
+                                          ScaffoldMessenger.of(
+                                            context,
+                                          ).showSnackBar(
+                                            const SnackBar(
+                                              content: Row(
+                                                children: [
+                                                  Icon(
+                                                    Icons.warning_amber_rounded,
+                                                    color: Colors.white,
+                                                  ),
+                                                  SizedBox(width: 10),
+                                                  Expanded(
+                                                    child: Text(
+                                                      'Tunggu dulu! Coba selesaikan daily activities-mu untuk mengalihkan rasa ingin merokok.',
+                                                      style: TextStyle(
+                                                        color: Colors.white,
+                                                      ),
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
+                                              backgroundColor: Colors
+                                                  .orange, // Warna peringatan
+                                              duration: Duration(seconds: 3),
+                                              behavior: SnackBarBehavior
+                                                  .floating, // Membuatnya melayang agar lebih terlihat
+                                            ),
+                                          );
+
+                                          // 3. Smoke count tetap bertambah ke server dan UI
+                                          _updateSmokeCount(_smokeCount + 1);
+                                        },
+                                        child: _smallCircleButton(Icons.add),
+                                      ),
+                                    ],
                                   ),
-                                )
-                              : Row(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    GestureDetector(
-                                      onTap: () {
-                                        if (_smokeCount > 0) {
-                                          _updateSmokeCount(_smokeCount - 1);
-                                        }
-                                      },
-                                      child: _smallCircleButton(Icons.remove),
-                                    ),
-                                    const SizedBox(width: 16),
-                                    Text(
-                                      '$_smokeCount',
-                                      style: const TextStyle(
-                                        fontSize: 36,
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                    ),
-                                    const SizedBox(width: 16),
-                                    GestureDetector(
-                                      onTap: () =>
-                                          _updateSmokeCount(_smokeCount + 1),
-                                      child: _smallCircleButton(Icons.add),
-                                    ),
-                                  ],
-                                ),
+                          ],
+                        ),
+                      ),
+                    ),
+
+                    const SizedBox(height: 10),
+
+                    // STREAK CARD
+                    _buildStreakCard(),
+
+                    const SizedBox(height: 10),
+
+                    // GRAFIK GABUNGAN
+                    _buildCombinedChart(),
+
+                    const SizedBox(height: 10),
+
+                    // TAB
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 20),
+                      child: Row(
+                        children: [
+                          _buildTab('Activities', 0),
+                          const SizedBox(width: 8),
+                          _buildTab('News', 1),
+                          const SizedBox(width: 8),
+                          _buildTab('Videos', 2),
                         ],
                       ),
                     ),
-                  ),
-                  const SizedBox(width: 12),
-                ],
+
+                    const SizedBox(height: 16),
+
+                    // CONTENT TAB
+                    _selectedTab == 0
+                        ? _buildActivitiesSection()
+                        : _selectedTab == 1
+                        ? _buildNewsSection()
+                        : _buildVideoSection(),
+
+                    const SizedBox(
+                      height: 30,
+                    ), // Padding bawah agar konten paling bawah tidak tertutup mentok
+                  ],
+                ),
               ),
-            ),
-
-            const SizedBox(height: 20),
-
-            // TAB
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20),
-              child: Row(
-                children: [
-                  _buildTab('Activities', 0),
-                  const SizedBox(width: 8),
-                  _buildTab('News', 1),
-                  const SizedBox(width: 8),
-                  _buildTab('Videos', 2),
-                ],
-              ),
-            ),
-
-            const SizedBox(height: 16),
-
-            // CONTENT
-            Expanded(
-              child: _selectedTab == 0
-                  ? _buildActivitiesSection()
-                  : _selectedTab == 1
-                  ? _buildNewsSection()
-                  : _buildVideoSection(),
             ),
           ],
         ),
@@ -391,6 +821,8 @@ class _HomeScreenState extends State<HomeScreen> {
     }
 
     return ListView.builder(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
       padding: const EdgeInsets.symmetric(horizontal: 20),
       itemCount: _activityList.length,
       itemBuilder: (context, index) {
@@ -463,6 +895,8 @@ class _HomeScreenState extends State<HomeScreen> {
 
         final newsList = snapshot.data ?? [];
         return ListView.builder(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
           padding: const EdgeInsets.symmetric(horizontal: 20),
           itemCount: newsList.length,
           itemBuilder: (context, index) {
@@ -490,7 +924,8 @@ class _HomeScreenState extends State<HomeScreen> {
                   children: [
                     ClipRRect(
                       borderRadius: BorderRadius.circular(8),
-                      child: article['urlToImage'] != null &&
+                      child:
+                          article['urlToImage'] != null &&
                               article['urlToImage'].toString().isNotEmpty
                           ? Image.network(
                               article['urlToImage'],
@@ -563,6 +998,8 @@ class _HomeScreenState extends State<HomeScreen> {
 
         final videoList = snapshot.data ?? [];
         return ListView.builder(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
           padding: const EdgeInsets.symmetric(horizontal: 20),
           itemCount: videoList.length,
           itemBuilder: (context, index) {
@@ -671,4 +1108,40 @@ class _OxygenGaugePainter extends CustomPainter {
   @override
   bool shouldRepaint(_OxygenGaugePainter old) =>
       old.value != value || old.color != color;
+}
+
+// Custom painter untuk membuat lingkaran putus-putus (dashed outline)
+class _DashedCirclePainter extends CustomPainter {
+  final Color color;
+  _DashedCirclePainter({required this.color});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = color
+      ..strokeWidth = 2
+      ..style = PaintingStyle.stroke;
+
+    double dashWidth = 5, dashSpace = 4;
+    double circumference = 2 * pi * (size.width / 2);
+    int dashCount = (circumference / (dashWidth + dashSpace)).floor();
+
+    double angle = 0;
+    double sweepAngle = (dashWidth / circumference) * 2 * pi;
+    double spaceAngle = (dashSpace / circumference) * 2 * pi;
+
+    for (int i = 0; i < dashCount; i++) {
+      canvas.drawArc(
+        Rect.fromLTWH(0, 0, size.width, size.height),
+        angle,
+        sweepAngle,
+        false,
+        paint,
+      );
+      angle += sweepAngle + spaceAngle;
+    }
+  }
+
+  @override
+  bool shouldRepaint(CustomPainter oldDelegate) => false;
 }

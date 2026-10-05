@@ -200,6 +200,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                             await SessionService.saveSession(
                                               result['uid'],
                                               result['data']['name'],
+                                              result['data']['role'],
                                             );
                                             // Pass uid ke MainScreen
                                             Navigator.pushReplacement(
@@ -208,6 +209,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                                 builder: (context) => MainScreen(
                                                   uid: result['uid'],
                                                   name: result['data']['name'],
+                                                  role: result['data']['role'],
                                                 ),
                                               ),
                                             );

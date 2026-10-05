@@ -4,8 +4,13 @@ import 'package:flutter/material.dart';
 
 class HistoryScreen extends StatefulWidget {
   final String userUid;
+  final void Function(String sessionId, String sessionName)? onSelectHistory;
 
-  const HistoryScreen({super.key, required this.userUid});
+  const HistoryScreen({
+    super.key,
+    required this.userUid,
+    this.onSelectHistory,
+  });
 
   @override
   State<HistoryScreen> createState() => _HistoryScreenState();
@@ -138,16 +143,20 @@ class _HistoryScreenState extends State<HistoryScreen> {
   }) {
     return GestureDetector(
       onTap: () {
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (context) => ChatScreen(
-              userUid: widget.userUid,
-              sessionId: sessionId,
-              sessionName: title,
+        if (widget.onSelectHistory != null) {
+          widget.onSelectHistory!(sessionId, title);
+        } else {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => ChatScreen(
+                userUid: widget.userUid,
+                sessionId: sessionId,
+                sessionName: title,
+              ),
             ),
-          ),
-        );
+          );
+        }
       },
       child: Container(
         width: double.infinity,

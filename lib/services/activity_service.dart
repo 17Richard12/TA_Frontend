@@ -44,9 +44,7 @@ class ActivityService {
     String activityId,
     bool isDone,
   ) async {
-    final url = Uri.parse(
-      '$baseUrl/$dailyActivityId/items/$activityId/check',
-    );
+    final url = Uri.parse('$baseUrl/$dailyActivityId/items/$activityId/check');
 
     try {
       final response = await http.patch(
@@ -66,6 +64,50 @@ class ActivityService {
     } catch (e) {
       print('Error update checklist: $e');
       return false;
+    }
+  }
+
+  static Future<List<dynamic>> getWeeklyActivityReport(
+    String userId,
+    String timestamp,
+  ) async {
+    final url = Uri.parse(
+      '$baseUrl/report?user_id=$userId&timestamp=$timestamp',
+    );
+
+    try {
+      final response = await http.get(url);
+
+      if (response.statusCode == 200) {
+        final jsonResponse = jsonDecode(response.body);
+        if (jsonResponse['status'] == 'success') {
+          return jsonResponse['data'] ?? [];
+        }
+      }
+      print('Gagal load activity report: ${response.body}');
+      return [];
+    } catch (e) {
+      print('Error getWeeklyActivityReport: $e');
+      return [];
+    }
+  }
+
+  static Future<int> getActivityStreak(String userId, String timestamp) async {
+    final url = Uri.parse(
+      '$baseUrl/streak?user_id=$userId&timestamp=$timestamp',
+    );
+    try {
+      final response = await http.get(url);
+      if (response.statusCode == 200) {
+        final jsonResponse = jsonDecode(response.body);
+        if (jsonResponse['status'] == 'success') {
+          return jsonResponse['data']['streak'] ?? 0;
+        }
+      }
+      return 0;
+    } catch (e) {
+      print('Error get streak: $e');
+      return 0;
     }
   }
 }

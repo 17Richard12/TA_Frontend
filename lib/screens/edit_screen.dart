@@ -4,11 +4,13 @@ import 'package:flutter/material.dart';
 class EditProfileScreen extends StatefulWidget {
   final String uid;
   final Map<String, dynamic> userData;
+  final String currentUserRole;
 
   const EditProfileScreen({
     super.key,
     required this.uid,
     required this.userData,
+    required this.currentUserRole,
   });
 
   @override
@@ -30,8 +32,10 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 
   DateTime? _dateOfBirth;
   String? _selectedGender;
+  String? _selectedRole;
 
   final List<String> _genderOptions = ['male', 'female'];
+  final List<String> _roleOptions = ['user', 'dokter'];
 
   @override
   void initState() {
@@ -61,6 +65,13 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     // Gender
     final g = d['gender']?.toString().toLowerCase();
     if (g == 'male' || g == 'female') _selectedGender = g;
+
+    final r = d['role']?.toString().toLowerCase();
+    if (_roleOptions.contains(r)) {
+      _selectedRole = r;
+    } else {
+      _selectedRole = 'user'; // Fallback
+    }
   }
 
   @override
@@ -120,6 +131,9 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         profileData['history'] = _historySicknessController.text.trim();
       if (_selectedGender != null) profileData['gender'] = _selectedGender;
       if (_dateOfBirth != null) profileData['birth'] = _toIsoDate(_dateOfBirth);
+      if (_selectedRole != null && (widget.currentUserRole == 'master')) {
+        profileData['role'] = _selectedRole;
+      }
 
       final result = await authService.editAccount(widget.uid, profileData);
 
@@ -150,6 +164,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final bool canEditRole = widget.currentUserRole == 'master';
     return Scaffold(
       backgroundColor: Colors.white,
       body: SafeArea(
@@ -214,6 +229,12 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                       onTap: _pickDate,
                     ),
                     const SizedBox(height: 16),
+
+                    if (canEditRole) ...[
+                      _buildLabel('Role'),
+                      _buildRoleDropdown(),
+                      const SizedBox(height: 16),
+                    ],
 
                     // Gender & Blood Type
                     Row(
@@ -415,6 +436,36 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
               )
               .toList(),
           onChanged: (value) => setState(() => _selectedGender = value),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildRoleDropdown() {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 20),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(28),
+        border: Border.all(color: Colors.black87, width: 1.5),
+      ),
+      child: DropdownButtonHideUnderline(
+        child: DropdownButton<String>(
+          value: _selectedRole,
+          hint: const Text(
+            'Select Role',
+            style: TextStyle(color: Colors.black45, fontSize: 15),
+          ),
+          isExpanded: true,
+          icon: const Icon(Icons.keyboard_arrow_down, color: Colors.black87),
+          items: _roleOptions
+              .map(
+                (r) => DropdownMenuItem(
+                  value: r,
+                  child: Text(r, style: const TextStyle(fontSize: 15)),
+                ),
+              )
+              .toList(),
+          onChanged: (value) => setState(() => _selectedRole = value),
         ),
       ),
     );

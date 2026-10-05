@@ -10,12 +10,14 @@ class ChatScreen extends StatefulWidget {
   final String userUid;
   final String? sessionId;
   final String sessionName;
+  final VoidCallback? onNewSession;
 
   const ChatScreen({
     super.key,
     required this.userUid,
     this.sessionId,
     this.sessionName = 'New Chat',
+    this.onNewSession,
   });
 
   @override
@@ -179,6 +181,15 @@ class _ChatScreenState extends State<ChatScreen> {
     });
   }
 
+  void _startNewSession() {
+    if (_isLoading) return;
+    setState(() {
+      _messages.clear();
+      _activeSessionId = null;
+    });
+    widget.onNewSession?.call();
+  }
+
   @override
   void dispose() {
     _controller.dispose();
@@ -199,13 +210,21 @@ class _ChatScreenState extends State<ChatScreen> {
               child: Row(
                 children: [
                   const SizedBox(width: 12),
-                  Text(
-                    widget.sessionName,
-                    style: const TextStyle(
-                      fontSize: 22,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.black87,
+                  Expanded(
+                    child: Text(
+                      _activeSessionId == null ? 'New Chat' : widget.sessionName,
+                      style: const TextStyle(
+                        fontSize: 22,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.black87,
+                      ),
+                      overflow: TextOverflow.ellipsis,
                     ),
+                  ),
+                  IconButton(
+                    onPressed: _startNewSession,
+                    icon: const Icon(Icons.add_circle_outline, color: Colors.black87),
+                    tooltip: 'Sesi Baru',
                   ),
                 ],
               ),

@@ -51,4 +51,28 @@ class SmokeService {
       return false;
     }
   }
+
+  static Future<List<dynamic>> getWeeklyReport(
+    String userId,
+    String timestamp,
+  ) async {
+    try {
+      final response = await http.get(
+        Uri.parse(
+          '${AppConstants.baseUrl}/api/smoke-count/report?user_id=$userId&timestamp=$timestamp',
+        ),
+      );
+
+      if (response.statusCode == 200) {
+        final jsonResponse = jsonDecode(response.body);
+        if (jsonResponse['status'] == 'success') {
+          return jsonResponse['data'] ?? [];
+        }
+      }
+      return [];
+    } catch (e) {
+      print('Error fetching report: $e');
+      return [];
+    }
+  }
 }
