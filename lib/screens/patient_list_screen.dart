@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:agent_doctor/services/auth_service.dart';
-import 'package:agent_doctor/screens/edit_screen.dart';
+import 'patient_report_screen.dart';
 
 class PatientListScreen extends StatefulWidget {
   final String currentUserRole;
@@ -40,7 +40,7 @@ class _PatientListScreenState extends State<PatientListScreen> {
       if (result['status'] == 'success') {
         setState(() {
           _allPatients = result['data'] ?? [];
-          _filteredPatients = _allPatients;
+          _filterPatients(); // <--- Pastikan pakai fungsi filter ini, JANGAN _filteredPatients = _allPatients;
           _isLoading = false;
         });
       } else {
@@ -63,20 +63,20 @@ class _PatientListScreenState extends State<PatientListScreen> {
     });
   }
 
-  void _navigateToEdit(Map<String, dynamic> user) async {
-    final updatedData = await Navigator.push(
+  void _navigateToReport(Map<String, dynamic> user) async {
+    await Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => EditProfileScreen(
-          uid: user['uid'],
-          userData: user,
+        builder: (context) => PatientReportScreen(
+          patientUid: user['uid'],
+          patientName: user['name'] ?? 'No Name',
           currentUserRole: widget.currentUserRole,
         ),
       ),
     );
 
-    // Refresh daftar jika profil atau role diupdate
-    if (updatedData != null) {
+    // Akan selalu dijalankan saat user kembali ke layar ini
+    if (mounted) {
       _fetchPatients();
     }
   }
@@ -138,7 +138,7 @@ class _PatientListScreenState extends State<PatientListScreen> {
                           color: Colors.grey,
                           size: 20,
                         ),
-                        onTap: () => _navigateToEdit(user),
+                        onTap: () => _navigateToReport(user),
                       );
                     },
                   ),

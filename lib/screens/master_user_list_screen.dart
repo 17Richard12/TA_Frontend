@@ -76,8 +76,8 @@ class _MasterUserListScreenState extends State<MasterUserListScreen> {
     );
 
     // Refresh daftar jika ada perubahan data
-    if (updatedData != null) {
-      _fetchUsers();
+    if (mounted) {
+      _fetchUsers(); // Sesuaikan dengan nama fungsi fetch di file ini
     }
   }
 

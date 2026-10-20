@@ -210,4 +210,76 @@ class AuthService {
       return {'status': 'error', 'message': 'Unexpected error: $e'};
     }
   }
+
+  Future<Map<String, dynamic>> getPatientDailyReport(
+    String uid,
+    String date,
+  ) async {
+    try {
+      final response = await _dio.get(
+        '/api/users/$uid/daily-report',
+        queryParameters: {'date': date},
+      );
+
+      final data = response.data;
+      if (data['status'] == 'success') {
+        return {'status': 'success', 'data': data['data']};
+      } else {
+        return {'status': 'error', 'message': data['message']};
+      }
+    } on DioException catch (e) {
+      return {'status': 'error', 'message': _handleDioError(e)};
+    } catch (e) {
+      return {'status': 'error', 'message': 'Unexpected error: $e'};
+    }
+  }
+
+  Future<Map<String, dynamic>> addActivity(
+    String uid,
+    String date,
+    String activity,
+  ) async {
+    try {
+      final res = await _dio.post(
+        '/api/users/$uid/activities',
+        data: {'date': date, 'activity': activity},
+      );
+      return res.data;
+    } catch (e) {
+      return {'status': 'error'};
+    }
+  }
+
+  Future<Map<String, dynamic>> editActivity(
+    String uid,
+    String activityId,
+    String date,
+    String activity,
+  ) async {
+    try {
+      final res = await _dio.put(
+        '/api/users/$uid/activities/$activityId',
+        data: {'date': date, 'activity': activity},
+      );
+      return res.data;
+    } catch (e) {
+      return {'status': 'error'};
+    }
+  }
+
+  Future<Map<String, dynamic>> deleteActivity(
+    String uid,
+    String activityId,
+    String date,
+  ) async {
+    try {
+      final res = await _dio.delete(
+        '/api/users/$uid/activities/$activityId',
+        queryParameters: {'date': date},
+      );
+      return res.data;
+    } catch (e) {
+      return {'status': 'error'};
+    }
+  }
 }
