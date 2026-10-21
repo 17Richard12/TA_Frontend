@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:agent_doctor/services/auth_service.dart';
-import 'package:agent_doctor/screens/edit_screen.dart';
+import 'package:lungs_assistant_agent/services/auth_service.dart';
+import 'package:lungs_assistant_agent/screens/edit_screen.dart';
 
 class PatientReportScreen extends StatefulWidget {
   final String patientUid;

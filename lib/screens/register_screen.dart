@@ -1,7 +1,7 @@
-import 'package:agent_doctor/screens/login_screen.dart';
-import 'package:agent_doctor/screens/main_screen.dart';
-import 'package:agent_doctor/services/auth_service.dart';
-import 'package:agent_doctor/services/session_service.dart';
+import 'package:lungs_assistant_agent/screens/login_screen.dart';
+import 'package:lungs_assistant_agent/screens/main_screen.dart';
+import 'package:lungs_assistant_agent/services/auth_service.dart';
+import 'package:lungs_assistant_agent/services/session_service.dart';
 import 'package:flutter/material.dart';
 
 class RegisterScreen extends StatefulWidget {

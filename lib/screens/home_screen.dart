@@ -1,9 +1,9 @@
 import 'dart:math';
-import 'package:agent_doctor/services/news_service.dart';
-import 'package:agent_doctor/services/oxygen_service.dart';
-import 'package:agent_doctor/services/youtube_service.dart';
-import 'package:agent_doctor/services/smoke_service.dart';
-import 'package:agent_doctor/services/activity_service.dart';
+import 'package:lungs_assistant_agent/services/news_service.dart';
+import 'package:lungs_assistant_agent/services/oxygen_service.dart';
+import 'package:lungs_assistant_agent/services/youtube_service.dart';
+import 'package:lungs_assistant_agent/services/smoke_service.dart';
+import 'package:lungs_assistant_agent/services/activity_service.dart';
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:fl_chart/fl_chart.dart';

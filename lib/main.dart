@@ -1,7 +1,7 @@
-import 'package:agent_doctor/firebase_options.dart';
-import 'package:agent_doctor/screens/auth_screen.dart';
-import 'package:agent_doctor/screens/main_screen.dart';
-import 'package:agent_doctor/services/session_service.dart';
+import 'package:lungs_assistant_agent/firebase_options.dart';
+import 'package:lungs_assistant_agent/screens/auth_screen.dart';
+import 'package:lungs_assistant_agent/screens/main_screen.dart';
+import 'package:lungs_assistant_agent/services/session_service.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 

@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:agent_doctor/services/auth_service.dart';
+import 'package:lungs_assistant_agent/services/auth_service.dart';
 import 'patient_report_screen.dart';
 
 class PatientListScreen extends StatefulWidget {

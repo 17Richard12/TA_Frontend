@@ -1,9 +1,10 @@
-import 'package:agent_doctor/screens/mri_screen.dart';
-import 'package:agent_doctor/screens/auth_screen.dart';
-import 'package:agent_doctor/screens/edit_screen.dart';
-import 'package:agent_doctor/screens/password_screen.dart';
-import 'package:agent_doctor/services/auth_service.dart';
-import 'package:agent_doctor/services/session_service.dart';
+import 'package:lungs_assistant_agent/screens/mri_screen.dart';
+import 'package:lungs_assistant_agent/screens/auth_screen.dart';
+import 'package:lungs_assistant_agent/screens/edit_screen.dart';
+import 'package:lungs_assistant_agent/screens/password_screen.dart';
+import 'package:lungs_assistant_agent/screens/xray_screen.dart';
+import 'package:lungs_assistant_agent/services/auth_service.dart';
+import 'package:lungs_assistant_agent/services/session_service.dart';
 import 'package:flutter/material.dart';
 
 class AccountScreen extends StatefulWidget {
@@ -71,7 +72,7 @@ class _AccountScreenState extends State<AccountScreen> {
                     ),
                   ),
 
-                  const SizedBox(height: 60),
+                  const SizedBox(height: 40),
 
                   // Change Password
                   _buildButton(
@@ -96,6 +97,20 @@ class _AccountScreenState extends State<AccountScreen> {
                         context,
                         MaterialPageRoute(
                           builder: (_) => MriScreen(userUid: widget.uid),
+                        ),
+                      );
+                    },
+                  ),
+
+                  const SizedBox(height: 14),
+
+                  _buildButton(
+                    label: 'Perbandingan X-Ray',
+                    onPressed: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => XrayScreen(userUid: widget.uid),
                         ),
                       );
                     },

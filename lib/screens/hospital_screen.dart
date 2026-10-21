@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:url_launcher/url_launcher.dart';
-import 'package:agent_doctor/services/hospital_service.dart';
+import 'package:lungs_assistant_agent/services/hospital_service.dart';
 
 class HospitalScreen extends StatefulWidget {
   const HospitalScreen({super.key});

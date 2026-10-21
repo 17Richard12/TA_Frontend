@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:agent_doctor/services/dashboard_service.dart';
+import 'package:lungs_assistant_agent/services/dashboard_service.dart';
 import 'package:fl_chart/fl_chart.dart'; // Tambahkan fl_chart
 
 class DashboardScreen extends StatefulWidget {

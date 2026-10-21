@@ -1,5 +1,5 @@
-import 'package:agent_doctor/screens/chat_screen.dart';
-import 'package:agent_doctor/services/chat_service.dart';
+import 'package:lungs_assistant_agent/screens/chat_screen.dart';
+import 'package:lungs_assistant_agent/services/chat_service.dart';
 import 'package:flutter/material.dart';
 
 class HistoryScreen extends StatefulWidget {

@@ -1,4 +1,4 @@
-import 'package:agent_doctor/services/auth_service.dart';
+import 'package:lungs_assistant_agent/services/auth_service.dart';
 import 'package:flutter/material.dart';
 
 class ChangePasswordScreen extends StatefulWidget {

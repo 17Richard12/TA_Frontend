@@ -1,5 +1,5 @@
 import 'dart:convert';
-import 'package:agent_doctor/constants.dart';
+import 'package:lungs_assistant_agent/constants.dart';
 import 'package:http/http.dart' as http;
 
 class YouTubeService {

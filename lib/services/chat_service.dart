@@ -1,4 +1,4 @@
-import 'package:agent_doctor/constants.dart';
+import 'package:lungs_assistant_agent/constants.dart';
 import 'package:dio/dio.dart';
 
 class ChatService {

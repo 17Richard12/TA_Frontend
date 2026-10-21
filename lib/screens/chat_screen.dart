@@ -1,7 +1,7 @@
 import 'dart:convert';
 import 'dart:async';
-import 'package:agent_doctor/constants.dart';
-import 'package:agent_doctor/services/chat_service.dart';
+import 'package:lungs_assistant_agent/constants.dart';
+import 'package:lungs_assistant_agent/services/chat_service.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:http/http.dart' as http;

@@ -1,6 +1,6 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
-import 'package:agent_doctor/constants.dart';
+import 'package:lungs_assistant_agent/constants.dart';
 
 class SmokeService {
   // Mengambil data smoke count harian

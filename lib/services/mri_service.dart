@@ -1,4 +1,4 @@
-import 'package:agent_doctor/constants.dart';
+import 'package:lungs_assistant_agent/constants.dart';
 import 'package:dio/dio.dart';
 
 class MriService {
@@ -6,7 +6,7 @@ class MriService {
     BaseOptions(
       baseUrl: AppConstants.baseUrl,
       connectTimeout: const Duration(seconds: 15),
-      receiveTimeout: const Duration(seconds: 30),
+      receiveTimeout: const Duration(seconds: 90),
       headers: {'Content-Type': 'application/json'},
     ),
   );

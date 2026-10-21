@@ -1,5 +1,5 @@
 import 'dart:convert';
-import 'package:agent_doctor/services/mri_service.dart';
+import 'package:lungs_assistant_agent/services/mri_service.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 
@@ -18,6 +18,7 @@ class _MriScreenState extends State<MriScreen> {
   bool _isUploading = false;
   Map<String, dynamic>? _newestMri;
   Map<String, dynamic>? _olderMri;
+  String? _aiAnalysis;
 
   final ImagePicker _picker = ImagePicker();
 
@@ -45,6 +46,9 @@ class _MriScreenState extends State<MriScreen> {
           _olderMri = dataList.length > 1 && dataList[1] is Map<String, dynamic>
               ? dataList[1] as Map<String, dynamic>
               : null;
+
+          // Tangkap data analisis AI dari backend
+          _aiAnalysis = data['analysis'] as String?;
         });
       }
       setState(() => _isLoading = false);
@@ -193,48 +197,101 @@ class _MriScreenState extends State<MriScreen> {
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
-          : SingleChildScrollView(
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _buildMriImage('Hasil MRI Terbaru', _newestMri),
-                  const SizedBox(height: 32),
-                  _buildMriImage('Hasil MRI Sebelumnya', _olderMri),
-                  const SizedBox(height: 48),
-                  SizedBox(
-                    width: double.infinity,
-                    height: 54,
-                    child: ElevatedButton(
-                      onPressed: _isUploading ? null : _uploadMri,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: primaryBlue,
-                        foregroundColor: Colors.white,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(14),
+          : RefreshIndicator(
+              onRefresh: _fetchData,
+              color: primaryBlue,
+              child: SingleChildScrollView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 24,
+                  vertical: 20,
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    if (_aiAnalysis != null && _aiAnalysis!.isNotEmpty)
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: primaryBlue.withOpacity(0.05),
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(
+                            color: primaryBlue.withOpacity(0.3),
+                          ),
                         ),
-                        elevation: 0,
-                      ),
-                      child: _isUploading
-                          ? const SizedBox(
-                              width: 24,
-                              height: 24,
-                              child: CircularProgressIndicator(
-                                color: Colors.white,
-                                strokeWidth: 2.5,
-                              ),
-                            )
-                          : const Text(
-                              'Upload MRI Terbaru',
-                              style: TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.bold,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: const [
+                                Icon(
+                                  Icons.auto_awesome,
+                                  color: primaryBlue,
+                                  size: 20,
+                                ),
+                                SizedBox(width: 8),
+                                Text(
+                                  'Analisis Agent',
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 16,
+                                    color: primaryBlue,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 12),
+                            Text(
+                              _aiAnalysis!,
+                              style: const TextStyle(
+                                fontSize: 14,
+                                color: Colors.black87,
+                                height: 1.5,
                               ),
                             ),
+                          ],
+                        ),
+                      ),
+                    const SizedBox(height: 20),
+                    _buildMriImage('Hasil MRI Terbaru', _newestMri),
+                    const SizedBox(height: 32),
+                    _buildMriImage('Hasil MRI Sebelumnya', _olderMri),
+                    const SizedBox(height: 48),
+                    SizedBox(
+                      width: double.infinity,
+                      height: 54,
+                      child: ElevatedButton(
+                        onPressed: _isUploading ? null : _uploadMri,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: primaryBlue,
+                          foregroundColor: Colors.white,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(14),
+                          ),
+                          elevation: 0,
+                        ),
+                        child: _isUploading
+                            ? const SizedBox(
+                                width: 24,
+                                height: 24,
+                                child: CircularProgressIndicator(
+                                  color: Colors.white,
+                                  strokeWidth: 2.5,
+                                ),
+                              )
+                            : const Text(
+                                'Upload MRI Terbaru',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 40),
-                ],
+                    const SizedBox(height: 40),
+                  ],
+                ),
               ),
             ),
     );

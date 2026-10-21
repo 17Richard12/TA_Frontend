@@ -1,5 +1,5 @@
-import 'package:agent_doctor/screens/login_screen.dart';
-import 'package:agent_doctor/screens/register_screen.dart';
+import 'package:lungs_assistant_agent/screens/login_screen.dart';
+import 'package:lungs_assistant_agent/screens/register_screen.dart';
 import 'package:flutter/material.dart';
 
 class AuthScreen extends StatefulWidget {
@@ -25,7 +25,7 @@ class _AuthScreenState extends State<AuthScreen> {
               mainAxisSize: MainAxisSize.min,
               children: [
                 const Text(
-                  'Agent Doctor',
+                  'Lungs Assistant Agent',
                   style: TextStyle(
                     fontSize: 22,
                     fontWeight: FontWeight.bold,

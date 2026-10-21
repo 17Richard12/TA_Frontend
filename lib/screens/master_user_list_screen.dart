@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:agent_doctor/services/auth_service.dart';
-import 'package:agent_doctor/screens/edit_screen.dart'; // Sesuaikan path jika berbeda
+import 'package:lungs_assistant_agent/services/auth_service.dart';
+import 'package:lungs_assistant_agent/screens/edit_screen.dart'; // Sesuaikan path jika berbeda
 
 class MasterUserListScreen extends StatefulWidget {
   final String currentUserRole;

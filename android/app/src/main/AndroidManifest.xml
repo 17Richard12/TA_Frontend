@@ -4,7 +4,7 @@
     <uses-permission android:name="android.permission.health.READ_BLOOD_OXYGEN"/>
 
     <application
-        android:label="agent_doctor"
+        android:label="Lungs Assistant Agent"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher"
         android:usesCleartextTraffic="true">
