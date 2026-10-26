@@ -6,11 +6,13 @@ class PatientReportScreen extends StatefulWidget {
   final String patientUid;
   final String patientName;
   final String currentUserRole;
+  final DateTime? initialDate;
   const PatientReportScreen({
     super.key,
     required this.patientUid,
     required this.patientName,
     required this.currentUserRole,
+    this.initialDate,
   });
 
   @override
@@ -21,7 +23,7 @@ class _PatientReportScreenState extends State<PatientReportScreen> {
   final AuthService _authService = AuthService();
 
   bool _isLoading = true;
-  DateTime _selectedDate = DateTime.now();
+  late DateTime _selectedDate;
   Map<String, dynamic>? _reportData;
   String _errorMessage = '';
 
@@ -30,6 +32,7 @@ class _PatientReportScreenState extends State<PatientReportScreen> {
   @override
   void initState() {
     super.initState();
+    _selectedDate = widget.initialDate ?? DateTime.now();
     _fetchReport();
   }
 

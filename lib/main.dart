@@ -4,9 +4,11 @@ import 'package:lungs_assistant_agent/screens/main_screen.dart';
 import 'package:lungs_assistant_agent/services/session_service.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
+import 'package:intl/date_symbol_data_local.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await initializeDateFormatting('id_ID', null);
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
   // Check session
   final uid = await SessionService.getUid();
