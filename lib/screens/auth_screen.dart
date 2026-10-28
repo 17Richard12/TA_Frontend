@@ -49,7 +49,7 @@ class _AuthScreenState extends State<AuthScreen> {
                 const SizedBox(height: 28),
 
                 const Text(
-                  'Your Doctor Anytime Anywhere',
+                  'Your Healthcare Anytime Anywhere',
                   style: TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.bold,

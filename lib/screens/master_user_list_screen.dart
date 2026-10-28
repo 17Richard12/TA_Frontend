@@ -86,6 +86,7 @@ class _MasterUserListScreenState extends State<MasterUserListScreen> {
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
+        automaticallyImplyLeading: false,
         title: const Text(
           'Manage Users',
           style: TextStyle(color: Colors.black87, fontWeight: FontWeight.bold),
