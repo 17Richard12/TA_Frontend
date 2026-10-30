@@ -238,6 +238,7 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   // --- GRAFIK GABUNGAN: SMOKE & ACTIVITY ---
+  // --- GRAFIK GABUNGAN: SMOKE & ACTIVITY ---
   Widget _buildCombinedChart() {
     // Tunggu sampai kedua API selesai
     if (_reportLoading || _activityReportLoading) {
@@ -250,6 +251,22 @@ class _HomeScreenState extends State<HomeScreen> {
     if (_weeklySmokeReport.isEmpty || _weeklyActivityReport.isEmpty) {
       return const SizedBox.shrink();
     }
+
+    // 1. CARI NILAI TERTINGGI DARI DATA (DINAMIS)
+    double maxChartValue =
+        20.0; // Minimal batas 20 agar grafik tidak terlalu pendek saat data 0
+    for (int i = 0; i < 7; i++) {
+      final double smokeCount = (_weeklySmokeReport[i]['count'] as num)
+          .toDouble();
+      final double activityCount = (_weeklyActivityReport[i]['count'] as num)
+          .toDouble();
+
+      if (smokeCount > maxChartValue) maxChartValue = smokeCount;
+      if (activityCount > maxChartValue) maxChartValue = activityCount;
+    }
+
+    // Tambahkan sedikit ruang (padding) di bagian atas agar batang tidak menyentuh atap
+    maxChartValue += 2;
 
     List<BarChartGroupData> barGroups = [];
     // Asumsi kedua data selalu memiliki panjang 7 (7 hari terakhir)
@@ -272,7 +289,7 @@ class _HomeScreenState extends State<HomeScreen> {
               borderRadius: BorderRadius.circular(4),
               backDrawRodData: BackgroundBarChartRodData(
                 show: true,
-                toY: 20, // Batas background abu-abu
+                toY: maxChartValue, // 2. GUNAKAN NILAI DINAMIS DI SINI
                 color: Colors.grey.shade100,
               ),
             ),
@@ -284,7 +301,7 @@ class _HomeScreenState extends State<HomeScreen> {
               borderRadius: BorderRadius.circular(4),
               backDrawRodData: BackgroundBarChartRodData(
                 show: true,
-                toY: 20,
+                toY: maxChartValue, // 2. GUNAKAN NILAI DINAMIS DI SINI
                 color: Colors.grey.shade100,
               ),
             ),
@@ -337,7 +354,7 @@ class _HomeScreenState extends State<HomeScreen> {
             child: BarChart(
               BarChartData(
                 alignment: BarChartAlignment.spaceAround,
-                maxY: 20,
+                maxY: maxChartValue, // 3. GUNAKAN NILAI DINAMIS DI SINI
                 barTouchData: BarTouchData(
                   enabled: true,
                   touchTooltipData: BarTouchTooltipData(

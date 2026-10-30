@@ -9,28 +9,55 @@ class PlacesService {
     double lat,
     double lng,
   ) async {
-    final response = await http.get(
-      Uri.parse(
-        'https://maps.googleapis.com/maps/api/place/nearbysearch/json'
-        '?location=$lat,$lng'
-        '&radius=3000'
-        '&type=hospital'
-        '&key=$_apiKey',
-      ),
+    // 1. Tambahkan keyword 'rumah sakit umum' agar Google memprioritaskan RS Umum/Daerah
+    final url = Uri.parse(
+      'https://maps.googleapis.com/maps/api/place/nearbysearch/json'
+      '?location=$lat,$lng'
+      '&radius=3000'
+      '&type=hospital'
+      '&keyword=rumah+sakit+umum'
+      '&key=$_apiKey',
     );
 
-    if (response.statusCode == 200) {
-      final data = json.decode(response.body);
+    final response = await http.get(url);
 
-      return (data['results'] as List).map((place) {
-        return {
-          'name': place['name'],
-          'lat': place['geometry']['location']['lat'],
-          'lng': place['geometry']['location']['lng'],
-        };
-      }).toList();
+    if (response.statusCode == 200) {
+      final decodedResponse = json.decode(response.body);
+      final List<dynamic> allResults = decodedResponse['results'] ?? [];
+
+      final List<Map<String, dynamic>> generalHospitals = [];
+
+      // 2. Filter manual untuk menyingkirkan RSIA, Klinik, dan Spesialis yang masih lolos
+      for (final place in allResults) {
+        final name = (place['name'] ?? '').toString().toLowerCase();
+
+        final isMaternity =
+            name.contains('ibu dan anak') ||
+            name.contains('rsia') ||
+            name.contains('bersalin');
+        final isClinic = name.contains('klinik') || name.contains('puskesmas');
+        final isSpecialist =
+            name.contains('gigi') ||
+            name.contains('mata') ||
+            name.contains('kecantikan');
+
+        // Jika BUKAN rumah sakit bersalin/klinik spesialis, masukkan ke daftar
+        if (!isMaternity && !isClinic && !isSpecialist) {
+          final location = place['geometry']['location'];
+          generalHospitals.add({
+            'name': place['name'],
+            'lat': location['lat'],
+            'lng': location['lng'],
+            'vicinity': place['vicinity'] ?? '', // Alamat singkat
+          });
+        }
+      }
+
+      return generalHospitals;
     } else {
-      throw Exception('Failed to load hospitals');
+      throw Exception(
+        'Gagal memuat data dari Google Maps API: ${response.statusCode}',
+      );
     }
   }
 }

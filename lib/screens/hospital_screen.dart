@@ -18,6 +18,13 @@ class _HospitalScreenState extends State<HospitalScreen> {
   LatLng? _currentPosition;
   Set<Marker> _markers = {};
 
+  String? _error;
+
+  void _setError(String message) {
+    if (!mounted) return;
+    setState(() => _error = message);
+  }
+
   @override
   void initState() {
     super.initState();
@@ -26,59 +33,98 @@ class _HospitalScreenState extends State<HospitalScreen> {
 
   // ✅ Ambil lokasi user + fetch RS
   Future<void> _getUserLocation() async {
-    bool serviceEnabled;
-    LocationPermission permission;
+    try {
+      // 1. Pastikan layanan lokasi di perangkat aktif
+      final serviceEnabled = await Geolocator.isLocationServiceEnabled();
+      if (!serviceEnabled) {
+        _setError(
+          'Layanan lokasi di perangkat nonaktif. '
+          'Aktifkan lokasi lalu coba lagi.',
+        );
+        return;
+      }
 
-    serviceEnabled = await Geolocator.isLocationServiceEnabled();
-    if (!serviceEnabled) return;
+      // 2. Cek dan minta izin lokasi
+      var permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+      }
+      if (permission == LocationPermission.denied) {
+        _setError(
+          'Izin lokasi ditolak. Izinkan lokasi untuk melihat '
+          'rumah sakit terdekat.',
+        );
+        return;
+      }
+      if (permission == LocationPermission.deniedForever) {
+        _setError(
+          'Izin lokasi diblokir. Buka Pengaturan aplikasi dan '
+          'izinkan akses lokasi.',
+        );
+        return;
+      }
 
-    permission = await Geolocator.checkPermission();
-    if (permission == LocationPermission.denied) {
-      permission = await Geolocator.requestPermission();
-      if (permission == LocationPermission.denied) return;
-    }
-
-    if (permission == LocationPermission.deniedForever) return;
-
-    Position position = await Geolocator.getCurrentPosition(
-      desiredAccuracy: LocationAccuracy.high,
-    );
-
-    final currentLatLng = LatLng(position.latitude, position.longitude);
-
-    setState(() {
-      _currentPosition = currentLatLng;
-    });
-
-    // ✅ Ambil data RS dari Places API
-    final hospitals = await PlacesService.fetchNearbyHospitals(
-      position.latitude,
-      position.longitude,
-    );
-
-    Set<Marker> newMarkers = {};
-
-    // ✅ Tambahkan marker RS
-    for (var hospital in hospitals) {
-      final lat = hospital['lat'];
-      final lng = hospital['lng'];
-      final name = hospital['name'];
-
-      newMarkers.add(
-        Marker(
-          markerId: MarkerId(name),
-          position: LatLng(lat, lng),
-          infoWindow: InfoWindow(title: name),
-          onTap: () {
-            _openGoogleMaps(lat, lng);
-          },
+      // 3. Ambil posisi pengguna (maksimal menunggu 15 detik)
+      final position = await Geolocator.getCurrentPosition(
+        locationSettings: const LocationSettings(
+          accuracy: LocationAccuracy.high,
         ),
-      );
-    }
+      ).timeout(const Duration(seconds: 15));
 
-    setState(() {
-      _markers = newMarkers;
-    });
+      if (!mounted) return;
+      setState(() {
+        _currentPosition = LatLng(position.latitude, position.longitude);
+        _error = null;
+      });
+
+      // 4. Ambil rumah sakit terdekat dari Places API.
+      //    Jika gagal, peta tetap tampil dan pengguna diberi tahu.
+      try {
+        final hospitals = await PlacesService.fetchNearbyHospitals(
+          position.latitude,
+          position.longitude,
+        );
+
+        final newMarkers = <Marker>{};
+        for (final hospital in hospitals) {
+          final lat = (hospital['lat'] as num).toDouble();
+          final lng = (hospital['lng'] as num).toDouble();
+          final name = hospital['name'].toString();
+
+          newMarkers.add(
+            Marker(
+              markerId: MarkerId('$name-$lat-$lng'),
+              position: LatLng(lat, lng),
+              infoWindow: InfoWindow(title: name),
+              onTap: () => _openGoogleMaps(lat, lng),
+            ),
+          );
+        }
+
+        if (!mounted) return;
+        setState(() => _markers = newMarkers);
+
+        if (newMarkers.isEmpty) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Tidak ada rumah sakit dalam radius 3 km.'),
+            ),
+          );
+        }
+      } catch (e) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Gagal memuat rumah sakit: $e')));
+      }
+    } on TimeoutException {
+      _setError(
+        'Waktu pengambilan lokasi habis. Pastikan lokasi perangkat '
+        'atau simulator sudah diatur, lalu coba lagi.',
+      );
+    } catch (e) {
+      _setError('Gagal mengambil lokasi: $e');
+    }
   }
 
   // ✅ Buka Google Maps app
@@ -96,6 +142,30 @@ class _HospitalScreenState extends State<HospitalScreen> {
 
   @override
   Widget build(BuildContext context) {
+    if (_error != null) {
+      return Scaffold(
+        body: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(_error!, textAlign: TextAlign.center),
+                const SizedBox(height: 16),
+                ElevatedButton(
+                  onPressed: () {
+                    setState(() => _error = null);
+                    _getUserLocation();
+                  },
+                  child: const Text('Coba lagi'),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+
     if (_currentPosition == null) {
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }

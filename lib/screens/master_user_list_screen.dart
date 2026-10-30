@@ -40,7 +40,7 @@ class _MasterUserListScreenState extends State<MasterUserListScreen> {
       if (result['status'] == 'success') {
         setState(() {
           _allUsers = result['data'] ?? [];
-          _filteredUsers = _allUsers;
+          _filterUsers(); // Pastikan _filterUsers dipanggil, jangan langsung overwrite _filteredUsers
           _isLoading = false;
         });
       } else {
@@ -77,7 +77,7 @@ class _MasterUserListScreenState extends State<MasterUserListScreen> {
 
     // Refresh daftar jika ada perubahan data
     if (mounted) {
-      _fetchUsers(); // Sesuaikan dengan nama fungsi fetch di file ini
+      _fetchUsers();
     }
   }
 
@@ -114,35 +114,57 @@ class _MasterUserListScreenState extends State<MasterUserListScreen> {
           Expanded(
             child: _isLoading
                 ? const Center(child: CircularProgressIndicator())
-                : _filteredUsers.isEmpty
-                ? const Center(child: Text('Tidak ada pengguna ditemukan.'))
-                : ListView.builder(
-                    itemCount: _filteredUsers.length,
-                    itemBuilder: (context, index) {
-                      final user = _filteredUsers[index];
-                      return ListTile(
-                        leading: CircleAvatar(
-                          backgroundColor: const Color(0xFF2F60CC),
-                          child: Text(
-                            (user['name'] ?? '?')[0].toUpperCase(),
-                            style: const TextStyle(color: Colors.white),
+                // Tambahkan RefreshIndicator di sini
+                : RefreshIndicator(
+                    onRefresh: _fetchUsers,
+                    child: _filteredUsers.isEmpty
+                        ? LayoutBuilder(
+                            builder: (context, constraints) {
+                              return SingleChildScrollView(
+                                physics:
+                                    const AlwaysScrollableScrollPhysics(), // Selalu bisa ditarik
+                                child: Container(
+                                  height: constraints.maxHeight,
+                                  alignment: Alignment.center,
+                                  child: const Text(
+                                    'Tidak ada pengguna ditemukan.',
+                                  ),
+                                ),
+                              );
+                            },
+                          )
+                        : ListView.builder(
+                            physics:
+                                const AlwaysScrollableScrollPhysics(), // Selalu bisa ditarik
+                            itemCount: _filteredUsers.length,
+                            itemBuilder: (context, index) {
+                              final user = _filteredUsers[index];
+                              return ListTile(
+                                leading: CircleAvatar(
+                                  backgroundColor: const Color(0xFF2F60CC),
+                                  child: Text(
+                                    (user['name'] ?? '?')[0].toUpperCase(),
+                                    style: const TextStyle(color: Colors.white),
+                                  ),
+                                ),
+                                title: Text(
+                                  user['name'] ?? 'No Name',
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                                subtitle: Text(
+                                  '${user['email'] ?? 'No Email'}\nRole: ${user['role'] ?? 'user'}',
+                                ),
+                                trailing: const Icon(
+                                  Icons.edit,
+                                  color: Colors.grey,
+                                  size: 20,
+                                ),
+                                onTap: () => _navigateToEdit(user),
+                              );
+                            },
                           ),
-                        ),
-                        title: Text(
-                          user['name'] ?? 'No Name',
-                          style: const TextStyle(fontWeight: FontWeight.bold),
-                        ),
-                        subtitle: Text(
-                          '${user['email'] ?? 'No Email'} • Role: ${user['role'] ?? 'user'}',
-                        ),
-                        trailing: const Icon(
-                          Icons.edit,
-                          color: Colors.grey,
-                          size: 20,
-                        ),
-                        onTap: () => _navigateToEdit(user),
-                      );
-                    },
                   ),
           ),
         ],

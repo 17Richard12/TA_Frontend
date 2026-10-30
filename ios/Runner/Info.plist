@@ -28,6 +28,8 @@
 	<true/>
 	<key>NSHealthShareUsageDescription</key>
 	<string>Aplikasi ini membutuhkan akses data kesehatan untuk memantau saturasi oksigen dan data kesehatan lainnya.</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>Aplikasi memerlukan lokasi Anda untuk menampilkan rumah sakit terdekat.</string>
 	<key>NSHealthUpdateUsageDescription</key>
 	<string>Aplikasi ini membutuhkan izin untuk menyimpan data kesehatan ke Health.</string>
 	<key>UIApplicationSupportsIndirectInputEvents</key>

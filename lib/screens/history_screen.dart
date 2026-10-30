@@ -6,11 +6,7 @@ class HistoryScreen extends StatefulWidget {
   final String userUid;
   final void Function(String sessionId, String sessionName)? onSelectHistory;
 
-  const HistoryScreen({
-    super.key,
-    required this.userUid,
-    this.onSelectHistory,
-  });
+  const HistoryScreen({super.key, required this.userUid, this.onSelectHistory});
 
   @override
   State<HistoryScreen> createState() => _HistoryScreenState();
@@ -67,33 +63,53 @@ class _HistoryScreenState extends State<HistoryScreen> {
               ),
             ),
 
-            // List Session
+            // List Session dengan RefreshIndicator yang selalu bisa di-pull
             Expanded(
               child: _isLoading
                   ? const Center(child: CircularProgressIndicator())
-                  : _sessions.isEmpty
-                  ? const Center(
-                      child: Text(
-                        'No history yet.',
-                        style: TextStyle(fontSize: 16, color: Colors.black45),
-                      ),
-                    )
                   : RefreshIndicator(
                       onRefresh: _loadHistory,
-                      child: ListView.builder(
-                        padding: const EdgeInsets.symmetric(horizontal: 20),
-                        itemCount: _sessions.length,
-                        itemBuilder: (context, index) {
-                          final session = _sessions[index];
-                          return _buildSessionCard(
-                            context: context,
-                            sessionId: session['session_id'] ?? '',
-                            title: session['title'] ?? '',
-                            lastTimestamp: session['last_timestamp'] ?? '',
-                            index: index + 1,
-                          );
-                        },
-                      ),
+                      child: _sessions.isEmpty
+                          ? LayoutBuilder(
+                              builder: (context, constraints) {
+                                return SingleChildScrollView(
+                                  // AlwaysScrollableScrollPhysics memastikan bisa di-scroll meskipun kosong
+                                  physics:
+                                      const AlwaysScrollableScrollPhysics(),
+                                  child: Container(
+                                    height: constraints
+                                        .maxHeight, // Memenuhi sisa layar
+                                    alignment: Alignment.center,
+                                    child: const Text(
+                                      'No history yet. Pull to refresh.',
+                                      style: TextStyle(
+                                        fontSize: 16,
+                                        color: Colors.black45,
+                                      ),
+                                    ),
+                                  ),
+                                );
+                              },
+                            )
+                          : ListView.builder(
+                              physics:
+                                  const AlwaysScrollableScrollPhysics(), // Pastikan list juga selalu bisa di-scroll
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 20,
+                              ),
+                              itemCount: _sessions.length,
+                              itemBuilder: (context, index) {
+                                final session = _sessions[index];
+                                return _buildSessionCard(
+                                  context: context,
+                                  sessionId: session['session_id'] ?? '',
+                                  title: session['title'] ?? '',
+                                  lastTimestamp:
+                                      session['last_timestamp'] ?? '',
+                                  index: index + 1,
+                                );
+                              },
+                            ),
                     ),
             ),
           ],

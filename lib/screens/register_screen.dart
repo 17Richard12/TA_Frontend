@@ -93,7 +93,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 ),
               ),
 
-              const SizedBox(height: 32),
+              const SizedBox(height: 60),
 
               // White card form
               Container(
@@ -103,6 +103,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   borderRadius: BorderRadius.only(
                     topLeft: Radius.circular(36),
                     topRight: Radius.circular(36),
+                    bottomLeft: Radius.circular(36),
+                    bottomRight: Radius.circular(36),
                   ),
                 ),
                 child: Padding(
@@ -123,8 +125,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
                           hint: 'Masukkan nama lengkap kamu',
                           icon: Icons.person_outline,
                           validator: (value) {
-                            if (value == null || value.isEmpty)
+                            if (value == null || value.isEmpty) {
                               return 'Nama tidak boleh kosong';
+                            }
                             return null;
                           },
                         ),
@@ -139,10 +142,12 @@ class _RegisterScreenState extends State<RegisterScreen> {
                           icon: Icons.email_outlined,
                           keyboardType: TextInputType.emailAddress,
                           validator: (value) {
-                            if (value == null || value.isEmpty)
+                            if (value == null || value.isEmpty) {
                               return 'Email tidak boleh kosong';
-                            if (!value.contains('@'))
+                            }
+                            if (!value.contains('@')) {
                               return 'Email tidak valid';
+                            }
                             return null;
                           },
                         ),
@@ -159,10 +164,12 @@ class _RegisterScreenState extends State<RegisterScreen> {
                             () => _obscurePassword = !_obscurePassword,
                           ),
                           validator: (value) {
-                            if (value == null || value.isEmpty)
+                            if (value == null || value.isEmpty) {
                               return 'Password tidak boleh kosong';
-                            if (value.length < 6)
+                            }
+                            if (value.length < 6) {
                               return 'Password minimal 6 karakter';
+                            }
                             return null;
                           },
                         ),
@@ -180,10 +187,12 @@ class _RegisterScreenState extends State<RegisterScreen> {
                                 !_obscureConfirmPassword,
                           ),
                           validator: (value) {
-                            if (value == null || value.isEmpty)
+                            if (value == null || value.isEmpty) {
                               return 'Konfirmasi password tidak boleh kosong';
-                            if (value != passwordController.text)
+                            }
+                            if (value != passwordController.text) {
                               return 'Password tidak cocok';
+                            }
                             return null;
                           },
                         ),
@@ -208,30 +217,44 @@ class _RegisterScreenState extends State<RegisterScreen> {
                                             );
                                         if (mounted) {
                                           if (result['status'] == 'success') {
-                                            // Simpan sesi login
+                                            // 1. Simpan sesi login (Dengan penanganan NULL)
                                             await SessionService.saveSession(
-                                              result['uid'],
-                                              result['data']['name'],
-                                              result['data']['role'],
+                                              result['uid']?.toString() ?? '',
+                                              result['data']['name']
+                                                      ?.toString() ??
+                                                  'User',
+                                              result['data']['role']
+                                                      ?.toString() ??
+                                                  'user', // Beri nilai default 'user' jika null
                                             );
-                                            // Langsung masuk ke MainScreen setelah register
+
+                                            // 2. Navigasi ke MainScreen
                                             Navigator.pushReplacement(
                                               context,
                                               MaterialPageRoute(
-                                                builder: (context) => MainScreen(
-                                                  uid: result['uid'],
-                                                  name: result['data']['name'],
-                                                  role: result['data']['role'],
-                                                ),
+                                                builder: (context) =>
+                                                    MainScreen(
+                                                      uid:
+                                                          result['uid']
+                                                              ?.toString() ??
+                                                          '',
+                                                      name:
+                                                          result['data']['name']
+                                                              ?.toString() ??
+                                                          'User',
+                                                      role:
+                                                          result['data']['role']
+                                                              ?.toString() ??
+                                                          'user',
+                                                    ),
                                               ),
                                             );
+
                                             ScaffoldMessenger.of(
                                               context,
                                             ).showSnackBar(
                                               const SnackBar(
-                                                content: Text(
-                                                  'Registrasi berhasil!',
-                                                ),
+                                                content: Text('Berhasil!'),
                                                 backgroundColor: Color(
                                                   0xFF2E3192,
                                                 ),
@@ -253,8 +276,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
                                           }
                                         }
                                       } finally {
-                                        if (mounted)
+                                        if (mounted) {
                                           setState(() => _isLoading = false);
+                                        }
                                       }
                                     }
                                   },
@@ -288,68 +312,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                                   ),
                           ),
                         ),
-                        const SizedBox(height: 28),
-
-                        // Divider
-                        Row(
-                          children: [
-                            Expanded(
-                              child: Divider(
-                                color: Colors.grey.shade300,
-                                thickness: 1,
-                              ),
-                            ),
-                            const Padding(
-                              padding: EdgeInsets.symmetric(horizontal: 12),
-                              child: Text(
-                                'atau',
-                                style: TextStyle(
-                                  color: Color(0xFFAAAAAA),
-                                  fontSize: 13,
-                                ),
-                              ),
-                            ),
-                            Expanded(
-                              child: Divider(
-                                color: Colors.grey.shade300,
-                                thickness: 1,
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 24),
-
-                        // Google register
-                        SizedBox(
-                          width: double.infinity,
-                          height: 54,
-                          child: OutlinedButton.icon(
-                            onPressed: () {},
-                            style: OutlinedButton.styleFrom(
-                              foregroundColor: const Color(0xFF333333),
-                              side: BorderSide(
-                                color: Colors.grey.shade300,
-                                width: 1.5,
-                              ),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(30),
-                              ),
-                            ),
-                            icon: const Icon(
-                              Icons.g_mobiledata,
-                              size: 28,
-                              color: Colors.redAccent,
-                            ),
-                            label: const Text(
-                              'Daftar dengan Google',
-                              style: TextStyle(
-                                fontSize: 14,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(height: 28),
+                        const SizedBox(height: 32),
 
                         // Login link
                         Row(

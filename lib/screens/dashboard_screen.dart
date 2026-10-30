@@ -187,7 +187,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
               _buildSummaryCard(
                 'Rokok',
                 smokeTotal.toString(),
-                Icons.whatshot,
+                Icons.smoking_rooms,
                 accentBlue,
               ),
               const SizedBox(width: 12),

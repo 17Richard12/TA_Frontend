@@ -40,7 +40,7 @@ class _PatientListScreenState extends State<PatientListScreen> {
       if (result['status'] == 'success') {
         setState(() {
           _allPatients = result['data'] ?? [];
-          _filterPatients(); // <--- Pastikan pakai fungsi filter ini, JANGAN _filteredPatients = _allPatients;
+          _filterPatients();
           _isLoading = false;
         });
       } else {
@@ -69,7 +69,7 @@ class _PatientListScreenState extends State<PatientListScreen> {
       MaterialPageRoute(
         builder: (context) => MonthlyReportScreen(
           userUid: user['uid'],
-          patientName: user['name'] ?? 'No Name', // <-- Tambahkan ini
+          patientName: user['name'] ?? 'No Name',
           currentUserRole: widget.currentUserRole,
         ),
       ),
@@ -114,34 +114,55 @@ class _PatientListScreenState extends State<PatientListScreen> {
           Expanded(
             child: _isLoading
                 ? const Center(child: CircularProgressIndicator())
-                : _filteredPatients.isEmpty
-                ? const Center(child: Text('Tidak ada pasien ditemukan.'))
-                : ListView.builder(
-                    itemCount: _filteredPatients.length,
-                    itemBuilder: (context, index) {
-                      final user = _filteredPatients[index];
-                      return ListTile(
-                        leading: CircleAvatar(
-                          backgroundColor: Colors
-                              .green, // Bedakan warna avatar untuk tab pasien
-                          child: Text(
-                            (user['name'] ?? '?')[0].toUpperCase(),
-                            style: const TextStyle(color: Colors.white),
+                // Tambahkan RefreshIndicator di sini
+                : RefreshIndicator(
+                    onRefresh: _fetchPatients, // Panggil ulang saat di-pull
+                    child: _filteredPatients.isEmpty
+                        ? LayoutBuilder(
+                            builder: (context, constraints) {
+                              return SingleChildScrollView(
+                                physics:
+                                    const AlwaysScrollableScrollPhysics(), // Agar selalu bisa di-pull
+                                child: Container(
+                                  height: constraints.maxHeight,
+                                  alignment: Alignment.center,
+                                  child: const Text(
+                                    'Tidak ada pasien ditemukan.',
+                                  ),
+                                ),
+                              );
+                            },
+                          )
+                        : ListView.builder(
+                            physics:
+                                const AlwaysScrollableScrollPhysics(), // Memaksa agar tetap bisa di-scroll meskpun item sedikit
+                            itemCount: _filteredPatients.length,
+                            itemBuilder: (context, index) {
+                              final user = _filteredPatients[index];
+                              return ListTile(
+                                leading: CircleAvatar(
+                                  backgroundColor: Colors.green,
+                                  child: Text(
+                                    (user['name'] ?? '?')[0].toUpperCase(),
+                                    style: const TextStyle(color: Colors.white),
+                                  ),
+                                ),
+                                title: Text(
+                                  user['name'] ?? 'No Name',
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                                subtitle: Text(user['email'] ?? 'No Email'),
+                                trailing: const Icon(
+                                  Icons.edit,
+                                  color: Colors.grey,
+                                  size: 20,
+                                ),
+                                onTap: () => _navigateToReport(user),
+                              );
+                            },
                           ),
-                        ),
-                        title: Text(
-                          user['name'] ?? 'No Name',
-                          style: const TextStyle(fontWeight: FontWeight.bold),
-                        ),
-                        subtitle: Text(user['email'] ?? 'No Email'),
-                        trailing: const Icon(
-                          Icons.edit,
-                          color: Colors.grey,
-                          size: 20,
-                        ),
-                        onTap: () => _navigateToReport(user),
-                      );
-                    },
                   ),
           ),
         ],
