@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:fl_chart/fl_chart.dart';
 import 'package:lungs_assistant_agent/services/auth_service.dart';
 import 'package:lungs_assistant_agent/screens/edit_screen.dart';
 
@@ -76,7 +77,7 @@ class _PatientReportScreenState extends State<PatientReportScreen> {
     final profileData = _reportData?['patient_data'];
     if (profileData == null) return;
 
-    final updatedData = await Navigator.push(
+    await Navigator.push(
       context,
       MaterialPageRoute(
         builder: (context) => EditProfileScreen(
@@ -87,8 +88,8 @@ class _PatientReportScreenState extends State<PatientReportScreen> {
       ),
     );
 
-    // Jika data berhasil diupdate dari EditProfileScreen, refresh laporan
-    if (updatedData != null) {
+    // Refresh laporan saat kembali dari EditProfileScreen
+    if (mounted) {
       _fetchReport();
     }
   }
@@ -296,6 +297,7 @@ class _PatientReportScreenState extends State<PatientReportScreen> {
 
     final profile = _reportData!['patient_data'] ?? {};
     final activities = _reportData!['activities_list'] as List<dynamic>? ?? [];
+    final List<dynamic> hourlyGraph = _reportData!['smoke_hourly_graph'] ?? [];
 
     return SingleChildScrollView(
       padding: const EdgeInsets.fromLTRB(
@@ -371,6 +373,17 @@ class _PatientReportScreenState extends State<PatientReportScreen> {
               ),
             ],
           ),
+          const SizedBox(height: 20),
+
+          // ==========================================
+          // GRAFIK MEROKOK PER JAM
+          // ==========================================
+          const Text(
+            'Grafik Merokok Per Jam',
+            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+          ),
+          const SizedBox(height: 8),
+          _buildHourlyChart(hourlyGraph, primaryBlue),
           const SizedBox(height: 20),
 
           const Text(
@@ -465,6 +478,160 @@ class _PatientReportScreenState extends State<PatientReportScreen> {
                   },
                 ),
         ],
+      ),
+    );
+  }
+
+  // ============================================================
+  // GRAFIK MEROKOK PER JAM (PATIENT REPORT)
+  // ============================================================
+  Widget _buildHourlyChart(List<dynamic> rawData, Color barColor) {
+    if (rawData.isEmpty ||
+        rawData.every((e) => ((e['count'] as num?) ?? 0) == 0)) {
+      return Container(
+        height: 240, // Tinggi dibuat sama persis dengan saat ada data
+        width: double.infinity,
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: Colors.grey[200]!),
+        ),
+        child: const Center(
+          child: Text(
+            'Data grafik tidak tersedia pada tanggal ini.',
+            style: TextStyle(color: Colors.grey),
+          ),
+        ),
+      );
+    }
+
+    double maxCount = 1;
+    for (int i = 0; i < rawData.length; i++) {
+      final double count = (rawData[i]['count'] as num?)?.toDouble() ?? 0.0;
+      if (count > maxCount) maxCount = count;
+    }
+
+    // Kunci nilai max Y agar proporsi background abu-abu konsisten
+    final double maxYValue = maxCount < 5 ? 5.0 : maxCount + 2.0;
+
+    final List<BarChartGroupData> barGroups = List.generate(rawData.length, (
+      i,
+    ) {
+      final double count = (rawData[i]['count'] as num?)?.toDouble() ?? 0.0;
+      return BarChartGroupData(
+        x: i,
+        barRods: [
+          BarChartRodData(
+            toY: count,
+            color: count > 0 ? barColor : Colors.grey.shade300,
+            width: 16, // Ketebalan bar dikunci
+            borderRadius: BorderRadius.circular(8),
+            backDrawRodData: BackgroundBarChartRodData(
+              show: true,
+              toY: maxYValue, // Pastikan background penuh sampai atas
+              color: Colors.grey.shade100,
+            ),
+          ),
+        ],
+      );
+    });
+
+    return Container(
+      height: 240, // Kunci tinggi statis
+      width: double.infinity,
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.grey[200]!),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.04),
+            blurRadius: 8,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(16),
+        child: SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          physics: const BouncingScrollPhysics(),
+          child: Container(
+            width:
+                rawData.length *
+                46.0, // Jarak antar batang dikunci secara matematis
+            padding: const EdgeInsets.only(
+              top: 24,
+              bottom: 8,
+              left: 16,
+              right: 16,
+            ),
+            child: BarChart(
+              BarChartData(
+                alignment: BarChartAlignment
+                    .spaceEvenly, // Jarak dibagikan secara merata
+                maxY: maxYValue,
+                minY: 0,
+                barTouchData: BarTouchData(
+                  enabled: true,
+                  touchTooltipData: BarTouchTooltipData(
+                    getTooltipItem: (group, groupIndex, rod, rodIndex) {
+                      return BarTooltipItem(
+                        '${rod.toY.toInt()} batang',
+                        const TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 12,
+                        ),
+                      );
+                    },
+                  ),
+                ),
+                titlesData: FlTitlesData(
+                  show: true,
+                  bottomTitles: AxisTitles(
+                    sideTitles: SideTitles(
+                      showTitles: true,
+                      reservedSize:
+                          30, // KUNCI AREA TEKS agar batang tidak mengecil/memanjang sendiri
+                      getTitlesWidget: (double value, TitleMeta meta) {
+                        final int index = value.toInt();
+                        if (index >= 0 && index < rawData.length) {
+                          final String hourStr =
+                              rawData[index]['hour'] as String? ?? '';
+                          final String hourOnly = hourStr.split(':').first;
+                          return Padding(
+                            padding: const EdgeInsets.only(top: 10.0),
+                            child: Text(
+                              hourOnly,
+                              style: const TextStyle(
+                                fontSize: 12,
+                                color: Colors.grey,
+                              ),
+                            ),
+                          );
+                        }
+                        return const SizedBox();
+                      },
+                    ),
+                  ),
+                  leftTitles: const AxisTitles(
+                    sideTitles: SideTitles(showTitles: false),
+                  ),
+                  topTitles: const AxisTitles(
+                    sideTitles: SideTitles(showTitles: false),
+                  ),
+                  rightTitles: const AxisTitles(
+                    sideTitles: SideTitles(showTitles: false),
+                  ),
+                ),
+                borderData: FlBorderData(show: false),
+                gridData: const FlGridData(show: false),
+                barGroups: barGroups,
+              ),
+            ),
+          ),
+        ),
       ),
     );
   }

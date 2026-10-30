@@ -5,13 +5,11 @@ import 'hospital_screen.dart';
 import 'history_screen.dart';
 import 'dashboard_screen.dart';
 import 'account_screen.dart';
-import 'master_user_list_screen.dart'; // Import screen baru
-import 'patient_list_screen.dart'; // Import screen baru
 
 class MainScreen extends StatefulWidget {
   final String uid;
   final String name;
-  final String role; // Tambahkan parameter role
+  final String role; // Parameter role
 
   const MainScreen({
     super.key,
@@ -30,6 +28,13 @@ class _MainScreenState extends State<MainScreen> {
 
   String? _chatSessionId;
   String _chatSessionName = 'New Chat';
+
+  // Counter refresh per tab agar memicu fetch data ulang saat tab dibuka
+  int _homeRefreshKey = 0;
+  int _hospitalRefreshKey = 0;
+  int _historyRefreshKey = 0;
+  int _reportRefreshKey = 0;
+  int _accountRefreshKey = 0;
 
   static const Color primaryBlue = Color(0xFF2F60CC);
 
@@ -51,18 +56,26 @@ class _MainScreenState extends State<MainScreen> {
     });
   }
 
+  void _onTabTapped(int index) {
+    setState(() {
+      _currentIndex = index;
+      if (index == 0) _homeRefreshKey++;
+      if (index == 2) _hospitalRefreshKey++;
+      if (index == 3) _historyRefreshKey++;
+      if (index == 4) _reportRefreshKey++;
+      if (index == 5) _accountRefreshKey++;
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
-    // Tentukan role untuk validasi tab
-    final bool isMaster = widget.role.toLowerCase() == 'master';
-    final bool isDokter =
-        widget.role.toLowerCase() == 'dokter' ||
-        widget.role.toLowerCase() == 'doctor';
-    final bool canViewPatients = isMaster || isDokter;
-
-    // 1. Menu Utama (Selalu ada untuk semua role)
+    // Menu Utama (Selalu ada untuk semua role)
     final List<Widget> screens = [
-      HomeScreen(name: _name, userUid: widget.uid),
+      HomeScreen(
+        key: ValueKey('home_$_homeRefreshKey'),
+        name: _name,
+        userUid: widget.uid,
+      ),
       ChatScreen(
         key: ValueKey(_chatSessionId ?? 'new_chat'),
         userUid: widget.uid,
@@ -75,12 +88,23 @@ class _MainScreenState extends State<MainScreen> {
           });
         },
       ),
-      const HospitalScreen(),
-      HistoryScreen(userUid: widget.uid, onSelectHistory: _onSelectHistory),
-      DashboardScreen(userUid: widget.uid),
+      HospitalScreen(
+        key: ValueKey('hospital_$_hospitalRefreshKey'),
+      ),
+      HistoryScreen(
+        key: ValueKey('history_$_historyRefreshKey'),
+        userUid: widget.uid,
+        onSelectHistory: _onSelectHistory,
+      ),
+      DashboardScreen(
+        key: ValueKey('report_$_reportRefreshKey'),
+        userUid: widget.uid,
+      ),
       AccountScreen(
+        key: ValueKey('account_$_accountRefreshKey'),
         uid: widget.uid,
         name: _name,
+        role: widget.role,
         onNameUpdated: _onNameUpdated,
       ),
     ];
@@ -118,47 +142,33 @@ class _MainScreenState extends State<MainScreen> {
       ),
     ];
 
-    // 2. Jika Dokter atau Master, tambahkan Patients secara BERPAHAMAN (Screens & NavItems berurutan)
-    if (canViewPatients) {
-      screens.add(PatientListScreen(currentUserRole: widget.role));
-      navItems.add(
-        const BottomNavigationBarItem(
-          icon: Icon(Icons.people_outline),
-          activeIcon: Icon(Icons.people),
-          label: 'Patients',
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, result) {
+        if (didPop) return;
+        // Jika sedang di tab selain Home, kembali ke Home dan refresh data
+        if (_currentIndex != 0) {
+          _onTabTapped(0);
+        }
+        // Jika sudah di Home, tahan agar tidak pop kembali ke login
+      },
+      child: Scaffold(
+        body: IndexedStack(index: _currentIndex, children: screens),
+        bottomNavigationBar: BottomNavigationBar(
+          currentIndex: _currentIndex,
+          onTap: _onTabTapped,
+          type: BottomNavigationBarType.fixed,
+          selectedItemColor: primaryBlue,
+          unselectedItemColor: Colors.black45,
+          selectedLabelStyle: const TextStyle(
+            fontSize: 11,
+            fontWeight: FontWeight.w600,
+          ),
+          unselectedLabelStyle: const TextStyle(fontSize: 11),
+          backgroundColor: Colors.white,
+          elevation: 8,
+          items: navItems,
         ),
-      );
-    }
-
-    // 3. Jika Master, tambahkan All Users di urutan paling akhir
-    if (isMaster) {
-      screens.add(MasterUserListScreen(currentUserRole: widget.role));
-      navItems.add(
-        const BottomNavigationBarItem(
-          icon: Icon(Icons.manage_accounts_outlined),
-          activeIcon: Icon(Icons.manage_accounts),
-          label:
-              'All Users', // Diubah dari 'Users' agar lebih jelas perbedaannya dengan Patients
-        ),
-      );
-    }
-
-    return Scaffold(
-      body: IndexedStack(index: _currentIndex, children: screens),
-      bottomNavigationBar: BottomNavigationBar(
-        currentIndex: _currentIndex,
-        onTap: (index) => setState(() => _currentIndex = index),
-        type: BottomNavigationBarType.fixed,
-        selectedItemColor: primaryBlue,
-        unselectedItemColor: Colors.black45,
-        selectedLabelStyle: const TextStyle(
-          fontSize: 11,
-          fontWeight: FontWeight.w600,
-        ),
-        unselectedLabelStyle: const TextStyle(fontSize: 11),
-        backgroundColor: Colors.white,
-        elevation: 8,
-        items: navItems,
       ),
     );
   }

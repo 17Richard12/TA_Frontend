@@ -474,7 +474,7 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
             ),
             const Text(
-              'Current streak',
+              'Current Daily Activities Streak',
               style: TextStyle(
                 fontSize: 14,
                 color: textSub, // Menggunakan warna abu-abu tema

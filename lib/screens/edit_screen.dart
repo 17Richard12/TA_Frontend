@@ -35,7 +35,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   String? _selectedRole;
 
   final List<String> _genderOptions = ['male', 'female'];
-  final List<String> _roleOptions = ['user', 'dokter'];
+  final List<String> _roleOptions = ['user', 'dokter', 'master'];
 
   @override
   void initState() {
@@ -115,24 +115,40 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   Future<void> _onSave() async {
     setState(() => _isLoading = true);
     try {
+      final bool isMaster =
+          widget.currentUserRole.trim().toLowerCase() == 'master';
       final profileData = <String, dynamic>{};
 
-      if (_nameController.text.trim().isNotEmpty)
+      if (_nameController.text.trim().isNotEmpty) {
         profileData['name'] = _nameController.text.trim();
-      if (_phoneController.text.trim().isNotEmpty)
-        profileData['phone'] = _phoneController.text.trim();
-      if (_bloodTypeController.text.trim().isNotEmpty)
-        profileData['bloodType'] = _bloodTypeController.text.trim();
-      if (_weightController.text.trim().isNotEmpty)
-        profileData['weight'] = double.tryParse(_weightController.text.trim());
-      if (_heightController.text.trim().isNotEmpty)
-        profileData['height'] = double.tryParse(_heightController.text.trim());
-      if (_historySicknessController.text.trim().isNotEmpty)
-        profileData['history'] = _historySicknessController.text.trim();
-      if (_selectedGender != null) profileData['gender'] = _selectedGender;
-      if (_dateOfBirth != null) profileData['birth'] = _toIsoDate(_dateOfBirth);
-      if (_selectedRole != null && (widget.currentUserRole == 'master')) {
-        profileData['role'] = _selectedRole;
+      }
+
+      if (isMaster) {
+        if (_selectedRole != null) {
+          profileData['role'] = _selectedRole;
+        }
+      } else {
+        if (_phoneController.text.trim().isNotEmpty) {
+          profileData['phone'] = _phoneController.text.trim();
+        }
+        if (_bloodTypeController.text.trim().isNotEmpty) {
+          profileData['bloodType'] = _bloodTypeController.text.trim();
+        }
+        if (_weightController.text.trim().isNotEmpty) {
+          profileData['weight'] = double.tryParse(_weightController.text.trim());
+        }
+        if (_heightController.text.trim().isNotEmpty) {
+          profileData['height'] = double.tryParse(_heightController.text.trim());
+        }
+        if (_historySicknessController.text.trim().isNotEmpty) {
+          profileData['history'] = _historySicknessController.text.trim();
+        }
+        if (_selectedGender != null) {
+          profileData['gender'] = _selectedGender;
+        }
+        if (_dateOfBirth != null) {
+          profileData['birth'] = _toIsoDate(_dateOfBirth);
+        }
       }
 
       final result = await authService.editAccount(widget.uid, profileData);
@@ -164,7 +180,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final bool canEditRole = widget.currentUserRole == 'master';
+    final bool isMaster =
+        widget.currentUserRole.trim().toLowerCase() == 'master';
     return Scaffold(
       backgroundColor: Colors.white,
       body: SafeArea(
@@ -214,94 +231,99 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                     ),
                     const SizedBox(height: 16),
 
-                    _buildLabel('Phone'),
-                    _buildTextField(
-                      controller: _phoneController,
-                      hint: 'Enter your phone number',
-                      keyboardType: TextInputType.phone,
-                    ),
-                    const SizedBox(height: 16),
-
-                    _buildLabel('Date Of Birth'),
-                    _buildDatePicker(
-                      value: _formatDate(_dateOfBirth),
-                      hint: 'Select date of birth',
-                      onTap: _pickDate,
-                    ),
-                    const SizedBox(height: 16),
-
-                    if (canEditRole) ...[
+                    if (isMaster) ...[
                       _buildLabel('Role'),
                       _buildRoleDropdown(),
                       const SizedBox(height: 16),
+                    ] else ...[
+                      _buildLabel('Phone'),
+                      _buildTextField(
+                        controller: _phoneController,
+                        hint: 'Enter your phone number',
+                        keyboardType: TextInputType.phone,
+                      ),
+                      const SizedBox(height: 16),
+
+                      _buildLabel('Date Of Birth'),
+                      _buildDatePicker(
+                        value: _formatDate(_dateOfBirth),
+                        hint: 'Select date of birth',
+                        onTap: _pickDate,
+                      ),
+                      const SizedBox(height: 16),
+
+                      // Gender & Blood Type
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                _buildLabel('Gender'),
+                                _buildDropdown(),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(width: 16),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                _buildLabel('Blood Type'),
+                                _buildTextField(
+                                  controller: _bloodTypeController,
+                                  hint: 'e.g. A',
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 16),
+
+                      // Weight & Height
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                _buildLabel('Weight'),
+                                _buildTextField(
+                                  controller: _weightController,
+                                  hint: 'kg',
+                                  keyboardType: TextInputType.number,
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(width: 16),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                _buildLabel('Height'),
+                                _buildTextField(
+                                  controller: _heightController,
+                                  hint: 'cm',
+                                  keyboardType: TextInputType.number,
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 16),
+
+                      _buildLabel('History Sickness'),
+                      _buildTextField(
+                        controller: _historySicknessController,
+                        hint: 'Enter history of sickness',
+                      ),
+                      const SizedBox(height: 16),
                     ],
 
-                    // Gender & Blood Type
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [_buildLabel('Gender'), _buildDropdown()],
-                          ),
-                        ),
-                        const SizedBox(width: 16),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              _buildLabel('Blood Type'),
-                              _buildTextField(
-                                controller: _bloodTypeController,
-                                hint: 'e.g. A',
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
                     const SizedBox(height: 16),
-
-                    // Weight & Height
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              _buildLabel('Weight'),
-                              _buildTextField(
-                                controller: _weightController,
-                                hint: 'kg',
-                                keyboardType: TextInputType.number,
-                              ),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(width: 16),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              _buildLabel('Height'),
-                              _buildTextField(
-                                controller: _heightController,
-                                hint: 'cm',
-                                keyboardType: TextInputType.number,
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 16),
-
-                    _buildLabel('History Sickness'),
-                    _buildTextField(
-                      controller: _historySicknessController,
-                      hint: 'Enter history of sickness',
-                    ),
-                    const SizedBox(height: 32),
 
                     // Save Button
                     SizedBox(

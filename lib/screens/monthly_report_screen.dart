@@ -66,12 +66,12 @@ class _MonthlyReportScreenState extends State<MonthlyReportScreen> {
     }
   }
 
-  void _onDaySelected(DateTime selectedDay, DateTime focusedDay) {
+  void _onDaySelected(DateTime selectedDay, DateTime focusedDay) async {
     final dateStr = DateFormat('yyyy-MM-dd').format(selectedDay);
 
     if (_availableDatesSet.contains(dateStr)) {
       // Jika ada data, arahkan ke laporan harian pasien
-      Navigator.push(
+      await Navigator.push(
         context,
         MaterialPageRoute(
           builder: (context) => PatientReportScreen(
@@ -82,6 +82,10 @@ class _MonthlyReportScreenState extends State<MonthlyReportScreen> {
           ),
         ),
       );
+      // Fetch ulang data setelah kembali dari PatientReportScreen
+      if (mounted) {
+        _fetchData();
+      }
     } else {
       // Jika kosong, tampilkan pesan
       ScaffoldMessenger.of(context).showSnackBar(

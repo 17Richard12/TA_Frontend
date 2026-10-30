@@ -212,8 +212,8 @@ class _LoginScreenState extends State<LoginScreen> {
                                                   'user', // Beri nilai default 'user' jika null
                                             );
 
-                                            // 2. Navigasi ke MainScreen
-                                            Navigator.pushReplacement(
+                                            // 2. Navigasi ke MainScreen (Hapus semua route sebelumnya)
+                                            Navigator.pushAndRemoveUntil(
                                               context,
                                               MaterialPageRoute(
                                                 builder: (context) =>
@@ -232,6 +232,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                                           'user',
                                                     ),
                                               ),
+                                              (route) => false,
                                             );
 
                                             ScaffoldMessenger.of(
@@ -310,7 +311,7 @@ class _LoginScreenState extends State<LoginScreen> {
                               ),
                             ),
                             GestureDetector(
-                              onTap: () => Navigator.push(
+                              onTap: () => Navigator.pushReplacement(
                                 context,
                                 MaterialPageRoute(
                                   builder: (context) => const RegisterScreen(),

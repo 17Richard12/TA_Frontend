@@ -86,13 +86,13 @@ class _PatientListScreenState extends State<PatientListScreen> {
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
-        automaticallyImplyLeading: false,
         title: const Text(
           'Daftar Pasien',
           style: TextStyle(color: Colors.black87, fontWeight: FontWeight.bold),
         ),
         backgroundColor: Colors.white,
         elevation: 0,
+        iconTheme: const IconThemeData(color: Colors.black87),
       ),
       body: Column(
         children: [

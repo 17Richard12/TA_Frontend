@@ -217,7 +217,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
             ),
           ),
           const SizedBox(height: 16),
-          _buildHourlyChart(hourlyGraphRaw),
+          _buildHourlyChart(hourlyGraphRaw, accentBlue),
           const SizedBox(height: 32),
 
           const Text(
@@ -287,130 +287,153 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
-  // GRAFIK MENGGUNAKAN FL_CHART
-  Widget _buildHourlyChart(List<dynamic> rawData) {
-    if (rawData.isEmpty) {
-      return const SizedBox(
-        height: 150,
-        child: Center(
+  // ============================================================
+  // GRAFIK MEROKOK PER JAM (DASHBOARD)
+  // ============================================================
+  Widget _buildHourlyChart(List<dynamic> rawData, Color barColor) {
+    if (rawData.isEmpty ||
+        rawData.every((e) => ((e['count'] as num?) ?? 0) == 0)) {
+      return Container(
+        height: 240, // Tinggi dibuat sama persis dengan saat ada data
+        width: double.infinity,
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: Colors.grey[200]!),
+        ),
+        child: const Center(
           child: Text(
-            'Data grafik tidak tersedia.',
-            style: TextStyle(color: textSub),
+            'Data grafik tidak tersedia pada tanggal ini.',
+            style: TextStyle(color: Colors.grey),
           ),
         ),
       );
     }
 
     double maxCount = 1;
-    List<BarChartGroupData> barGroups = [];
-
-    // Safety parsing tipe data agar grafik konsisten naik
     for (int i = 0; i < rawData.length; i++) {
-      final item = rawData[i];
-      final double count = (item['count'] as num?)?.toDouble() ?? 0.0;
+      final double count = (rawData[i]['count'] as num?)?.toDouble() ?? 0.0;
       if (count > maxCount) maxCount = count;
-
-      barGroups.add(
-        BarChartGroupData(
-          x: i,
-          barRods: [
-            BarChartRodData(
-              toY: count,
-              color: count > 0 ? accentBlue : Colors.grey.shade300,
-              width: 12,
-              borderRadius: BorderRadius.circular(4),
-              backDrawRodData: BackgroundBarChartRodData(
-                show: true,
-                toY: maxCount < 5
-                    ? 5
-                    : maxCount + 2, // Background batas atas dinamis
-                color: Colors.grey.shade100,
-              ),
-            ),
-          ],
-        ),
-      );
     }
 
+    // Kunci nilai max Y agar proporsi background abu-abu konsisten
+    final double maxYValue = maxCount < 5 ? 5.0 : maxCount + 2.0;
+
+    final List<BarChartGroupData> barGroups = List.generate(rawData.length, (
+      i,
+    ) {
+      final double count = (rawData[i]['count'] as num?)?.toDouble() ?? 0.0;
+      return BarChartGroupData(
+        x: i,
+        barRods: [
+          BarChartRodData(
+            toY: count,
+            color: count > 0 ? barColor : Colors.grey.shade300,
+            width: 16, // Ketebalan bar dikunci
+            borderRadius: BorderRadius.circular(8),
+            backDrawRodData: BackgroundBarChartRodData(
+              show: true,
+              toY: maxYValue, // Pastikan background penuh sampai atas
+              color: Colors.grey.shade100,
+            ),
+          ),
+        ],
+      );
+    });
+
     return Container(
-      height: 220,
+      height: 240, // Kunci tinggi statis
+      width: double.infinity,
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.grey[200]!),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.06),
-            blurRadius: 10,
+            color: Colors.black.withOpacity(0.04),
+            blurRadius: 8,
             offset: const Offset(0, 4),
           ),
         ],
       ),
-      // Dibungkus scroll horizontal agar 24 data tidak tergencet/menumpuk
-      child: SingleChildScrollView(
-        scrollDirection: Axis.horizontal,
-        child: Container(
-          width:
-              rawData.length * 36.0, // Memberi ruang proporsional untuk 24 jam
-          padding: const EdgeInsets.all(16),
-          child: BarChart(
-            BarChartData(
-              alignment: BarChartAlignment.spaceAround,
-              maxY: maxCount < 5 ? 5 : maxCount + 2, // Jarak batas atas grafik
-              barTouchData: BarTouchData(
-                enabled: true,
-                touchTooltipData: BarTouchTooltipData(
-                  getTooltipItem: (group, groupIndex, rod, rodIndex) {
-                    return BarTooltipItem(
-                      '${rod.toY.toInt()} batang',
-                      const TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 12,
-                      ),
-                    );
-                  },
-                ),
-              ),
-              titlesData: FlTitlesData(
-                show: true,
-                bottomTitles: AxisTitles(
-                  sideTitles: SideTitles(
-                    showTitles: true,
-                    getTitlesWidget: (double value, TitleMeta meta) {
-                      int index = value.toInt();
-                      if (index >= 0 && index < rawData.length) {
-                        String hourStr = rawData[index]['hour'] ?? '';
-                        String hourOnly = hourStr
-                            .split(':')
-                            .first; // Ambil jam saja ("00", "12")
-                        return Padding(
-                          padding: const EdgeInsets.only(top: 8.0),
-                          child: Text(
-                            hourOnly,
-                            style: const TextStyle(
-                              fontSize: 10,
-                              color: textSub,
-                            ),
-                          ),
-                        );
-                      }
-                      return const Text('');
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(16),
+        child: SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          physics: const BouncingScrollPhysics(),
+          child: Container(
+            width:
+                rawData.length *
+                46.0, // Jarak antar batang dikunci secara matematis
+            padding: const EdgeInsets.only(
+              top: 24,
+              bottom: 8,
+              left: 16,
+              right: 16,
+            ),
+            child: BarChart(
+              BarChartData(
+                alignment: BarChartAlignment
+                    .spaceEvenly, // Jarak dibagikan secara merata
+                maxY: maxYValue,
+                minY: 0,
+                barTouchData: BarTouchData(
+                  enabled: true,
+                  touchTooltipData: BarTouchTooltipData(
+                    getTooltipItem: (group, groupIndex, rod, rodIndex) {
+                      return BarTooltipItem(
+                        '${rod.toY.toInt()} batang',
+                        const TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 12,
+                        ),
+                      );
                     },
                   ),
                 ),
-                leftTitles: const AxisTitles(
-                  sideTitles: SideTitles(showTitles: false),
+                titlesData: FlTitlesData(
+                  show: true,
+                  bottomTitles: AxisTitles(
+                    sideTitles: SideTitles(
+                      showTitles: true,
+                      reservedSize:
+                          30, // KUNCI AREA TEKS agar batang tidak mengecil/memanjang sendiri
+                      getTitlesWidget: (double value, TitleMeta meta) {
+                        final int index = value.toInt();
+                        if (index >= 0 && index < rawData.length) {
+                          final String hourStr =
+                              rawData[index]['hour'] as String? ?? '';
+                          final String hourOnly = hourStr.split(':').first;
+                          return Padding(
+                            padding: const EdgeInsets.only(top: 10.0),
+                            child: Text(
+                              hourOnly,
+                              style: const TextStyle(
+                                fontSize: 12,
+                                color: Colors.grey,
+                              ),
+                            ),
+                          );
+                        }
+                        return const SizedBox();
+                      },
+                    ),
+                  ),
+                  leftTitles: const AxisTitles(
+                    sideTitles: SideTitles(showTitles: false),
+                  ),
+                  topTitles: const AxisTitles(
+                    sideTitles: SideTitles(showTitles: false),
+                  ),
+                  rightTitles: const AxisTitles(
+                    sideTitles: SideTitles(showTitles: false),
+                  ),
                 ),
-                topTitles: const AxisTitles(
-                  sideTitles: SideTitles(showTitles: false),
-                ),
-                rightTitles: const AxisTitles(
-                  sideTitles: SideTitles(showTitles: false),
-                ),
+                borderData: FlBorderData(show: false),
+                gridData: const FlGridData(show: false),
+                barGroups: barGroups,
               ),
-              borderData: FlBorderData(show: false),
-              gridData: const FlGridData(show: false),
-              barGroups: barGroups,
             ),
           ),
         ),

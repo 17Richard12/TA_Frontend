@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:lungs_assistant_agent/services/auth_service.dart';
-import 'package:lungs_assistant_agent/screens/edit_screen.dart'; // Sesuaikan path jika berbeda
+import 'package:lungs_assistant_agent/screens/edit_role_screen.dart';
 
 class MasterUserListScreen extends StatefulWidget {
   final String currentUserRole;
@@ -64,10 +64,10 @@ class _MasterUserListScreenState extends State<MasterUserListScreen> {
   }
 
   void _navigateToEdit(Map<String, dynamic> user) async {
-    final updatedData = await Navigator.push(
+    await Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => EditProfileScreen(
+        builder: (context) => EditUserRoleScreen(
           uid: user['uid'],
           userData: user,
           currentUserRole: widget.currentUserRole,
@@ -86,13 +86,13 @@ class _MasterUserListScreenState extends State<MasterUserListScreen> {
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
-        automaticallyImplyLeading: false,
         title: const Text(
           'Manage Users',
           style: TextStyle(color: Colors.black87, fontWeight: FontWeight.bold),
         ),
         backgroundColor: Colors.white,
         elevation: 0,
+        iconTheme: const IconThemeData(color: Colors.black87),
       ),
       body: Column(
         children: [

@@ -228,8 +228,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
                                                   'user', // Beri nilai default 'user' jika null
                                             );
 
-                                            // 2. Navigasi ke MainScreen
-                                            Navigator.pushReplacement(
+                                            // 2. Navigasi ke MainScreen (Hapus semua route sebelumnya)
+                                            Navigator.pushAndRemoveUntil(
                                               context,
                                               MaterialPageRoute(
                                                 builder: (context) =>
@@ -248,6 +248,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                                                           'user',
                                                     ),
                                               ),
+                                              (route) => false,
                                             );
 
                                             ScaffoldMessenger.of(

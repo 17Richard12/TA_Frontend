@@ -188,7 +188,7 @@ class _MriScreenState extends State<MriScreen> {
       backgroundColor: Colors.white,
       appBar: AppBar(
         title: const Text(
-          'Perbandingan MRI',
+          'Perbandingan CT Scan',
           style: TextStyle(color: Colors.black87, fontWeight: FontWeight.bold),
         ),
         backgroundColor: Colors.white,
