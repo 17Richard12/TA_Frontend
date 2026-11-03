@@ -1,5 +1,6 @@
 import 'package:lungs_assistant_agent/screens/login_screen.dart';
 import 'package:lungs_assistant_agent/screens/main_screen.dart';
+import 'package:lungs_assistant_agent/screens/terms_and_about_screen.dart';
 import 'package:lungs_assistant_agent/services/auth_service.dart';
 import 'package:lungs_assistant_agent/services/session_service.dart';
 import 'package:flutter/material.dart';
@@ -158,7 +159,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         const SizedBox(height: 8),
                         _buildPasswordField(
                           controller: passwordController,
-                          hint: 'Buat password kamu',
+                          hint: 'Min 8 karakter, 1 huruf besar & angka',
                           obscure: _obscurePassword,
                           onToggle: () => setState(
                             () => _obscurePassword = !_obscurePassword,
@@ -167,8 +168,17 @@ class _RegisterScreenState extends State<RegisterScreen> {
                             if (value == null || value.isEmpty) {
                               return 'Password tidak boleh kosong';
                             }
-                            if (value.length < 6) {
-                              return 'Password minimal 6 karakter';
+                            if (value.length < 8) {
+                              return 'Password minimal 8 karakter';
+                            }
+                            if (!RegExp(r'(?=.*[A-Z])').hasMatch(value)) {
+                              return 'Harus mengandung minimal 1 huruf besar';
+                            }
+                            if (!RegExp(r'(?=.*[a-z])').hasMatch(value)) {
+                              return 'Harus mengandung minimal 1 huruf kecil';
+                            }
+                            if (!RegExp(r'(?=.*[0-9])').hasMatch(value)) {
+                              return 'Harus mengandung minimal 1 angka';
                             }
                             return null;
                           },
@@ -188,10 +198,19 @@ class _RegisterScreenState extends State<RegisterScreen> {
                           ),
                           validator: (value) {
                             if (value == null || value.isEmpty) {
-                              return 'Konfirmasi password tidak boleh kosong';
+                              return 'Password tidak boleh kosong';
                             }
-                            if (value != passwordController.text) {
-                              return 'Password tidak cocok';
+                            if (value.length < 8) {
+                              return 'Password minimal 8 karakter';
+                            }
+                            if (!RegExp(r'(?=.*[A-Z])').hasMatch(value)) {
+                              return 'Harus mengandung minimal 1 huruf besar';
+                            }
+                            if (!RegExp(r'(?=.*[a-z])').hasMatch(value)) {
+                              return 'Harus mengandung minimal 1 huruf kecil';
+                            }
+                            if (!RegExp(r'(?=.*[0-9])').hasMatch(value)) {
+                              return 'Harus mengandung minimal 1 angka';
                             }
                             return null;
                           },
@@ -229,11 +248,12 @@ class _RegisterScreenState extends State<RegisterScreen> {
                                             );
 
                                             // 2. Navigasi ke MainScreen (Hapus semua route sebelumnya)
-                                            Navigator.pushAndRemoveUntil(
+                                            Navigator.pushReplacement(
                                               context,
                                               MaterialPageRoute(
                                                 builder: (context) =>
-                                                    MainScreen(
+                                                    TermsAndAboutScreen(
+                                                      // <--- Ganti di sini
                                                       uid:
                                                           result['uid']
                                                               ?.toString() ??
@@ -248,7 +268,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
                                                           'user',
                                                     ),
                                               ),
-                                              (route) => false,
                                             );
 
                                             ScaffoldMessenger.of(

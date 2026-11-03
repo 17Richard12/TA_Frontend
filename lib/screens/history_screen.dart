@@ -53,7 +53,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
               padding: EdgeInsets.fromLTRB(0, 16, 0, 24),
               child: Center(
                 child: Text(
-                  'History',
+                  'History Chat',
                   style: TextStyle(
                     fontSize: 30,
                     fontWeight: FontWeight.bold,

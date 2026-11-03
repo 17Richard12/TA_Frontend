@@ -165,15 +165,40 @@ class AuthService {
   String _handleDioError(DioException e) {
     switch (e.type) {
       case DioExceptionType.connectionTimeout:
-        return 'Connection timeout. Periksa koneksi kamu.';
+      case DioExceptionType.sendTimeout:
       case DioExceptionType.receiveTimeout:
-        return 'Server terlalu lama merespons.';
+        return 'Koneksi internetmu lambat. Pastikan sinyal stabil dan coba lagi ya.';
+
       case DioExceptionType.connectionError:
-        return 'Tidak bisa terhubung ke server.';
-      default:
+        return 'Gagal terhubung ke sistem. Periksa koneksi internetmu.';
+
+      case DioExceptionType.badResponse:
         final statusCode = e.response?.statusCode;
-        final message = e.response?.data?['detail'] ?? e.message;
-        return 'Error $statusCode: $message';
+
+        // Ambil pesan dari backend jika ada
+        final backendMessage =
+            e.response?.data?['detail'] ?? e.response?.data?['message'];
+
+        // Filter pesan berdasarkan kode status HTTP
+        if (statusCode == 400) {
+          // Biasanya karena input salah (misal email sudah terdaftar)
+          return backendMessage ??
+              'Data yang kamu masukkan kurang tepat. Coba periksa lagi ya.';
+        } else if (statusCode == 401) {
+          // Biasanya karena password salah / sesi habis
+          return 'Email atau kata sandi tidak sesuai. Silakan periksa kembali.';
+        } else if (statusCode == 403) {
+          return 'Maaf, kamu tidak memiliki akses untuk tindakan ini.';
+        } else if (statusCode == 404) {
+          return 'Data yang kamu cari tidak ditemukan.';
+        } else if (statusCode != null && statusCode >= 500) {
+          return 'Maaf, server kami sedang sibuk atau ada gangguan. Coba beberapa saat lagi ya.';
+        }
+
+        return 'Ups, terjadi gangguan sistem. Silakan coba beberapa saat lagi.';
+
+      default:
+        return 'Terjadi kesalahan yang tidak terduga. Silakan coba lagi.';
     }
   }
 
@@ -280,6 +305,29 @@ class AuthService {
       return res.data;
     } catch (e) {
       return {'status': 'error'};
+    }
+  }
+
+  Future<Map<String, dynamic>> submitOnboarding(
+    String uid,
+    Map<String, dynamic> onboardingData,
+  ) async {
+    try {
+      final response = await _dio.post(
+        '/api/users/$uid/onboarding',
+        data: onboardingData,
+      );
+
+      final data = response.data;
+      if (data['status'] == 'success') {
+        return {'status': 'success', 'message': data['message']};
+      } else {
+        return {'status': 'error', 'message': data['message']};
+      }
+    } on DioException catch (e) {
+      return {'status': 'error', 'message': _handleDioError(e)};
+    } catch (e) {
+      return {'status': 'error', 'message': 'Unexpected error: $e'};
     }
   }
 }
