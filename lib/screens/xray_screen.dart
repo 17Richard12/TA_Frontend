@@ -18,6 +18,7 @@ class _XrayScreenState extends State<XrayScreen> {
   bool _isUploading = false;
   Map<String, dynamic>? _newestXray;
   Map<String, dynamic>? _olderXray;
+  bool _isPickerActive = false;
   String? _aiAnalysis;
 
   final ImagePicker _picker = ImagePicker();
@@ -57,6 +58,10 @@ class _XrayScreenState extends State<XrayScreen> {
   }
 
   Future<void> _uploadXray() async {
+    // 2. Cegah fungsi berjalan jika picker sedang aktif
+    if (_isPickerActive) return;
+    _isPickerActive = true;
+
     try {
       final XFile? image = await _picker.pickImage(
         source: ImageSource.gallery,
@@ -64,7 +69,11 @@ class _XrayScreenState extends State<XrayScreen> {
         maxWidth: 800,
         maxHeight: 800,
       );
-      if (image == null) return;
+
+      if (image == null) {
+        _isPickerActive = false;
+        return;
+      }
 
       setState(() => _isUploading = true);
 
@@ -103,6 +112,8 @@ class _XrayScreenState extends State<XrayScreen> {
         );
       }
     } finally {
+      // 3. Pastikan state di-reset
+      _isPickerActive = false;
       if (mounted) setState(() => _isUploading = false);
     }
   }

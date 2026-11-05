@@ -18,6 +18,7 @@ class _MriScreenState extends State<MriScreen> {
   bool _isUploading = false;
   Map<String, dynamic>? _newestMri;
   Map<String, dynamic>? _olderMri;
+  bool _isPickerActive = false;
   String? _aiAnalysis;
 
   final ImagePicker _picker = ImagePicker();
@@ -56,12 +57,21 @@ class _MriScreenState extends State<MriScreen> {
   }
 
   Future<void> _uploadMri() async {
+    // 2. Cegah fungsi berjalan jika picker sedang aktif
+    if (_isPickerActive) return;
+    _isPickerActive = true;
+
     try {
       final XFile? image = await _picker.pickImage(
         source: ImageSource.gallery,
         imageQuality: 80,
       );
-      if (image == null) return;
+
+      if (image == null) {
+        _isPickerActive =
+            false; // Kembalikan state jika user batal memilih gambar
+        return;
+      }
 
       setState(() => _isUploading = true);
 
@@ -76,7 +86,7 @@ class _MriScreenState extends State<MriScreen> {
         if (result['status'] == 'success') {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content: Text('Berhasil upload foto MRI'),
+              content: Text('Berhasil upload foto CT Scan'),
               backgroundColor: primaryBlue,
             ),
           );
@@ -100,6 +110,8 @@ class _MriScreenState extends State<MriScreen> {
         );
       }
     } finally {
+      // 3. Kembalikan state di blok finally agar selalu tereksekusi
+      _isPickerActive = false;
       if (mounted) setState(() => _isUploading = false);
     }
   }
@@ -254,9 +266,9 @@ class _MriScreenState extends State<MriScreen> {
                         ),
                       ),
                     const SizedBox(height: 20),
-                    _buildMriImage('Hasil MRI Terbaru', _newestMri),
+                    _buildMriImage('Hasil CT Scan Terbaru', _newestMri),
                     const SizedBox(height: 32),
-                    _buildMriImage('Hasil MRI Sebelumnya', _olderMri),
+                    _buildMriImage('Hasil CT Scan Sebelumnya', _olderMri),
                     const SizedBox(height: 48),
                     SizedBox(
                       width: double.infinity,
@@ -281,7 +293,7 @@ class _MriScreenState extends State<MriScreen> {
                                 ),
                               )
                             : const Text(
-                                'Upload MRI Terbaru',
+                                'Upload CT Scan Terbaru',
                                 style: TextStyle(
                                   fontSize: 16,
                                   fontWeight: FontWeight.bold,

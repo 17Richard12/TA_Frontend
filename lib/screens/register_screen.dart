@@ -269,17 +269,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
                                                     ),
                                               ),
                                             );
-
-                                            ScaffoldMessenger.of(
-                                              context,
-                                            ).showSnackBar(
-                                              const SnackBar(
-                                                content: Text('Berhasil!'),
-                                                backgroundColor: Color(
-                                                  0xFF2E3192,
-                                                ),
-                                              ),
-                                            );
                                           } else {
                                             ScaffoldMessenger.of(
                                               context,

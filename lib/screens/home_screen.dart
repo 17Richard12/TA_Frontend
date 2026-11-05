@@ -684,43 +684,91 @@ class _HomeScreenState extends State<HomeScreen> {
                                       const SizedBox(width: 16),
                                       GestureDetector(
                                         onTap: () {
-                                          // 1. Hapus snackbar sebelumnya (jika user tap berkali-kali dengan cepat)
-                                          ScaffoldMessenger.of(
-                                            context,
-                                          ).clearSnackBars();
-
-                                          // 2. Tampilkan warning
-                                          ScaffoldMessenger.of(
-                                            context,
-                                          ).showSnackBar(
-                                            const SnackBar(
-                                              content: Row(
-                                                children: [
-                                                  Icon(
-                                                    Icons.warning_amber_rounded,
-                                                    color: Colors.white,
-                                                  ),
-                                                  SizedBox(width: 10),
-                                                  Expanded(
-                                                    child: Text(
-                                                      'Tunggu dulu! Coba selesaikan daily activities-mu untuk mengalihkan rasa ingin merokok.',
+                                          showDialog(
+                                            context: context,
+                                            builder: (BuildContext context) {
+                                              return AlertDialog(
+                                                shape: RoundedRectangleBorder(
+                                                  borderRadius:
+                                                      BorderRadius.circular(20),
+                                                ),
+                                                title: const Row(
+                                                  children: [
+                                                    Icon(
+                                                      Icons
+                                                          .warning_amber_rounded,
+                                                      color: Colors.orange,
+                                                      size: 28,
+                                                    ),
+                                                    SizedBox(width: 10),
+                                                    Text(
+                                                      'Tunggu Dulu! ✋',
                                                       style: TextStyle(
-                                                        color: Colors.white,
+                                                        fontWeight:
+                                                            FontWeight.bold,
+                                                        fontSize: 18,
+                                                      ),
+                                                    ),
+                                                  ],
+                                                ),
+                                                content: const Text(
+                                                  'Coba selesaikan daily activities-mu untuk mengalihkan rasa ingin merokok.\n\nApakah kamu yakin ingin tetap menambah jumlah rokok?',
+                                                  style: TextStyle(
+                                                    fontSize: 14,
+                                                    color: Colors.black87,
+                                                    height: 1.5,
+                                                  ),
+                                                ),
+                                                actions: [
+                                                  TextButton(
+                                                    onPressed: () {
+                                                      Navigator.pop(
+                                                        context,
+                                                      ); // Tutup dialog tanpa menambah
+                                                    },
+                                                    child: const Text(
+                                                      'BATAL',
+                                                      style: TextStyle(
+                                                        color: Colors.grey,
+                                                        fontWeight:
+                                                            FontWeight.bold,
+                                                      ),
+                                                    ),
+                                                  ),
+                                                  ElevatedButton(
+                                                    onPressed: () {
+                                                      Navigator.pop(
+                                                        context,
+                                                      ); // Tutup dialog
+                                                      _updateSmokeCount(
+                                                        _smokeCount + 1,
+                                                      ); // Tambah jumlah rokok
+                                                    },
+                                                    style: ElevatedButton.styleFrom(
+                                                      backgroundColor:
+                                                          Colors.orange,
+                                                      foregroundColor:
+                                                          Colors.white,
+                                                      shape: RoundedRectangleBorder(
+                                                        borderRadius:
+                                                            BorderRadius.circular(
+                                                              12,
+                                                            ),
+                                                      ),
+                                                      elevation: 0,
+                                                    ),
+                                                    child: const Text(
+                                                      'TETAP TAMBAH',
+                                                      style: TextStyle(
+                                                        fontWeight:
+                                                            FontWeight.bold,
                                                       ),
                                                     ),
                                                   ),
                                                 ],
-                                              ),
-                                              backgroundColor: Colors
-                                                  .orange, // Warna peringatan
-                                              duration: Duration(seconds: 3),
-                                              behavior: SnackBarBehavior
-                                                  .floating, // Membuatnya melayang agar lebih terlihat
-                                            ),
+                                              );
+                                            },
                                           );
-
-                                          // 3. Smoke count tetap bertambah ke server dan UI
-                                          _updateSmokeCount(_smokeCount + 1);
                                         },
                                         child: _smallCircleButton(Icons.add),
                                       ),
