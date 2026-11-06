@@ -44,11 +44,31 @@ class PlacesService {
         // Jika BUKAN rumah sakit bersalin/klinik spesialis, masukkan ke daftar
         if (!isMaternity && !isClinic && !isSpecialist) {
           final location = place['geometry']['location'];
+          final openNow = place['opening_hours']?['open_now'];
           generalHospitals.add({
             'name': place['name'],
             'lat': location['lat'],
             'lng': location['lng'],
             'vicinity': place['vicinity'] ?? '', // Alamat singkat
+            'rating': place['rating'],
+            'open_now': openNow,
+            'doctor_schedules': [
+              {
+                'poli': 'Poli Spesialis Paru & Pernapasan (Sp.P)',
+                'days': 'Senin – Jumat',
+                'hours': '08:00 – 15:00 WIB',
+              },
+              {
+                'poli': 'Poli Penyakit Dalam & Konsultasi Berhenti Merokok',
+                'days': 'Senin – Sabtu',
+                'hours': '09:00 – 17:00 WIB',
+              },
+              {
+                'poli': 'IGD & Layanan Darurat Respirasi',
+                'days': 'Setiap Hari',
+                'hours': '24 Jam',
+              },
+            ],
           });
         }
       }

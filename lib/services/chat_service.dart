@@ -113,7 +113,9 @@ class ChatService {
         return 'Tidak bisa terhubung ke server. Pastikan backend berjalan.';
       default:
         final statusCode = e.response?.statusCode;
-        final message = e.response?.data?['detail'] ?? e.message;
+        final respData = e.response?.data;
+        final message =
+            (respData is Map ? respData['detail'] : null) ?? e.message;
         return 'Error $statusCode: $message';
     }
   }

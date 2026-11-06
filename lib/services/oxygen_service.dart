@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:health/health.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -26,10 +27,10 @@ class OxygenService {
         [HealthDataType.BLOOD_OXYGEN],
         permissions: [HealthDataAccess.READ],
       );
-      print('DEBUG Permission granted: $granted');
+      debugPrint('DEBUG Permission granted: $granted');
       return granted;
     } catch (e) {
-      print('DEBUG requestPermission error: $e');
+      debugPrint('DEBUG requestPermission error: $e');
       return false;
     }
   }
@@ -43,7 +44,7 @@ class OxygenService {
         [HealthDataType.BLOOD_OXYGEN],
         permissions: [HealthDataAccess.READ],
       );
-      print('DEBUG hasPermission: $hasPermission');
+      debugPrint('DEBUG hasPermission: $hasPermission');
 
       if (hasPermission != true) {
         final granted = await _health.requestAuthorization(
@@ -59,9 +60,9 @@ class OxygenService {
         types: [HealthDataType.BLOOD_OXYGEN],
       );
 
-      print('DEBUG Data count: ${data.length}');
+      debugPrint('DEBUG Data count: ${data.length}');
       for (final d in data) {
-        print(
+        debugPrint(
           'DEBUG SpO2: ${d.value} at ${d.dateFrom} source: ${d.sourceName}',
         );
       }
@@ -73,7 +74,7 @@ class OxygenService {
           .toDouble();
       return value > 1 ? value : value * 100;
     } catch (e) {
-      print('DEBUG getLatestOxygenLevel error: $e');
+      debugPrint('DEBUG getLatestOxygenLevel error: $e');
       return 0.0;
     }
   }

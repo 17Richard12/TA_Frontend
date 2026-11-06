@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:lungs_assistant_agent/services/dashboard_service.dart';
+import 'package:lungs_assistant_agent/state/smoke_sync.dart';
 import 'package:fl_chart/fl_chart.dart'; // Tambahkan fl_chart
 
 class DashboardScreen extends StatefulWidget {
@@ -25,22 +26,48 @@ class _DashboardScreenState extends State<DashboardScreen> {
   @override
   void initState() {
     super.initState();
+    SmokeSync.instance.addListener(_onSmokeChanged);
     _fetchData();
+  }
+
+  @override
+  void dispose() {
+    SmokeSync.instance.removeListener(_onSmokeChanged);
+    super.dispose();
+  }
+
+  bool get _isToday {
+    final now = DateTime.now();
+    return _selectedDate.year == now.year &&
+        _selectedDate.month == now.month &&
+        _selectedDate.day == now.day;
+  }
+
+  /// Dipanggil ketika Home berhasil menyimpan jumlah rokok baru.
+  void _onSmokeChanged() {
+    if (!mounted || !_isToday) return;
+    _fetchData(silent: true);
   }
 
   String get _formattedDate {
     return "${_selectedDate.year}-${_selectedDate.month.toString().padLeft(2, '0')}-${_selectedDate.day.toString().padLeft(2, '0')}";
   }
 
-  Future<void> _fetchData() async {
-    setState(() => _isLoading = true);
+  Future<void> _fetchData({bool silent = false}) async {
+    if (!silent || _dashboardData == null) {
+      setState(() => _isLoading = true);
+    }
+    // Tunggu penyimpanan rokok dari Home selesai agar tidak membaca data basi (angka 0)
+    await SmokeSync.instance.waitForPendingWrites();
+    final requestedDate = _formattedDate;
     final data = await DashboardService.getDashboardData(
       widget.userUid,
-      _formattedDate,
+      requestedDate,
     );
-    if (mounted) {
+    // Abaikan respons jika user sudah mengganti tanggal selama request berjalan
+    if (mounted && requestedDate == _formattedDate) {
       setState(() {
-        _dashboardData = data;
+        _dashboardData = data ?? _dashboardData;
         _isLoading = false;
       });
     }
@@ -115,7 +142,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   ),
                   Container(
                     decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.1),
+                      color: Colors.white.withValues(alpha: 0.1),
                       shape: BoxShape.circle,
                     ),
                     child: IconButton(
@@ -149,8 +176,15 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   Widget _buildContent() {
-    final int smokeTotal =
-        (_dashboardData!['smoke_count_total'] as num?)?.toInt() ?? 0;
+    final int? confirmedToday = _isToday
+        ? SmokeSync.instance.confirmedCountFor(widget.userUid, _formattedDate)
+        : null;
+    final int smokeTotal = confirmedToday ??
+        ((_dashboardData!['smoke_count_total'] as num?)?.toInt() ?? 0);
+    final int smokeLimitLow =
+        (_dashboardData!['smoke_limit_low'] as num?)?.toInt() ?? 5;
+    final int smokeLimitHigh =
+        (_dashboardData!['smoke_limit_high'] as num?)?.toInt() ?? 10;
     final int actTotal =
         (_dashboardData!['daily_activities_done_total'] as num?)?.toInt() ?? 0;
     final int chatTotal = (_dashboardData!['chat_total'] as num?)?.toInt() ?? 0;
@@ -206,6 +240,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
               ),
             ],
           ),
+          const SizedBox(height: 16),
+
+          // BATAS RENDAH & BATAS TINGGI ROKOK CARD
+          _buildSmokeThresholdCard(smokeTotal, smokeLimitLow, smokeLimitHigh),
           const SizedBox(height: 32),
 
           const Text(
@@ -243,6 +281,126 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
+  Widget _buildSmokeThresholdCard(
+    int smokeTotal,
+    int smokeLimitLow,
+    int smokeLimitHigh,
+  ) {
+    final bool isHigh = smokeTotal >= smokeLimitHigh;
+    final bool isWarn = !isHigh && smokeTotal >= smokeLimitLow;
+    final Color statusColor = isHigh
+        ? Colors.redAccent
+        : (isWarn ? Colors.orange.shade800 : Colors.green.shade700);
+    final String statusLabel = isHigh
+        ? 'Warning: Melebihi Batas Tinggi ($smokeLimitHigh batang)'
+        : (isWarn
+              ? 'Warning: Mencapai Batas Rendah ($smokeLimitLow batang)'
+              : 'Aman: Di Bawah Batas Rendah');
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: statusColor.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: statusColor.withValues(alpha: 0.35)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(
+                isHigh || isWarn
+                    ? Icons.warning_amber_rounded
+                    : Icons.verified_user_outlined,
+                color: statusColor,
+                size: 20,
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  statusLabel,
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.bold,
+                    color: statusColor,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              Expanded(
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    vertical: 8,
+                    horizontal: 10,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Batas Rendah',
+                        style: TextStyle(fontSize: 11, color: textSub),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        '$smokeLimitLow Batang / Hari',
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.orange.shade800,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    vertical: 8,
+                    horizontal: 10,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Batas Tinggi',
+                        style: TextStyle(fontSize: 11, color: textSub),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        '$smokeLimitHigh Batang / Hari',
+                        style: const TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.redAccent,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildSummaryCard(
     String title,
     String value,
@@ -257,7 +415,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
           borderRadius: BorderRadius.circular(16),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.05),
+              color: Colors.black.withValues(alpha: 0.05),
               blurRadius: 8,
               offset: const Offset(0, 4),
             ),
@@ -350,7 +508,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
         border: Border.all(color: Colors.grey[200]!),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.04),
+            color: Colors.black.withValues(alpha: 0.04),
             blurRadius: 8,
             offset: const Offset(0, 4),
           ),
@@ -446,9 +604,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       decoration: BoxDecoration(
-        color: Colors.green.withOpacity(0.05),
+        color: Colors.green.withValues(alpha: 0.05),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.green.withOpacity(0.3)),
+        border: Border.all(color: Colors.green.withValues(alpha: 0.3)),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,

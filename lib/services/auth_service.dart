@@ -176,8 +176,10 @@ class AuthService {
         final statusCode = e.response?.statusCode;
 
         // Ambil pesan dari backend jika ada
-        final backendMessage =
-            e.response?.data?['detail'] ?? e.response?.data?['message'];
+        final respData = e.response?.data;
+        final backendMessage = respData is Map
+            ? (respData['detail'] ?? respData['message'])?.toString()
+            : null;
 
         // Filter pesan berdasarkan kode status HTTP
         if (statusCode == 400) {

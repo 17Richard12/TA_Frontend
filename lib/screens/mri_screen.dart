@@ -1,7 +1,7 @@
 import 'dart:convert';
-import 'package:lungs_assistant_agent/services/mri_service.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:lungs_assistant_agent/services/mri_service.dart';
 
 class MriScreen extends StatefulWidget {
   final String userUid;
@@ -14,14 +14,19 @@ class MriScreen extends StatefulWidget {
 
 class _MriScreenState extends State<MriScreen> {
   static const Color primaryBlue = Color(0xFF2F60CC);
+  static const Color primaryDark = Color(0xFF1A1A8C);
   bool _isLoading = true;
   bool _isUploading = false;
+  bool _isAnalyzing = false;
   Map<String, dynamic>? _newestMri;
   Map<String, dynamic>? _olderMri;
   bool _isPickerActive = false;
   String? _aiAnalysis;
 
   final ImagePicker _picker = ImagePicker();
+
+  static const Set<String> _allowedExtensions = {'jpg', 'jpeg', 'png', 'webp'};
+  static const int _maxFileBytes = 5 * 1024 * 1024; // 5 MB
 
   @override
   void initState() {
@@ -44,38 +49,233 @@ class _MriScreenState extends State<MriScreen> {
               dataList.isNotEmpty && dataList[0] is Map<String, dynamic>
               ? dataList[0] as Map<String, dynamic>
               : null;
-          _olderMri = dataList.length > 1 && dataList[1] is Map<String, dynamic>
+          _olderMri =
+              dataList.length > 1 && dataList[1] is Map<String, dynamic>
               ? dataList[1] as Map<String, dynamic>
               : null;
 
-          // Tangkap data analisis AI dari backend
-          _aiAnalysis = data['analysis'] as String?;
+          final rawAnalysis = (data['analysis'] as String?)?.trim() ?? '';
+          _aiAnalysis = rawAnalysis.isNotEmpty ? rawAnalysis : null;
         });
       }
       setState(() => _isLoading = false);
     }
   }
 
+  void _showValidationErrorDialog(String message) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => Container(
+        padding: const EdgeInsets.fromLTRB(24, 20, 24, 28),
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 44,
+              height: 5,
+              decoration: BoxDecoration(
+                color: Colors.grey.shade300,
+                borderRadius: BorderRadius.circular(10),
+              ),
+            ),
+            const SizedBox(height: 20),
+            Container(
+              width: 60,
+              height: 60,
+              decoration: BoxDecoration(
+                color: Colors.redAccent.withValues(alpha: 0.12),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(
+                Icons.error_outline,
+                color: Colors.redAccent,
+                size: 34,
+              ),
+            ),
+            const SizedBox(height: 16),
+            const Text(
+              'Gambar Ditolak',
+              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+            ),
+            const SizedBox(height: 10),
+            Text(
+              message,
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                fontSize: 14,
+                color: Colors.black87,
+                height: 1.5,
+              ),
+            ),
+            const SizedBox(height: 24),
+            SizedBox(
+              width: double.infinity,
+              height: 48,
+              child: ElevatedButton(
+                onPressed: () => Navigator.pop(ctx),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: primaryBlue,
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                ),
+                child: const Text(
+                  'Mengerti',
+                  style: TextStyle(fontWeight: FontWeight.bold),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showAnalysisBottomSheet(String analysisText) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => Container(
+        padding: const EdgeInsets.fromLTRB(24, 20, 24, 28),
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Center(
+              child: Container(
+                width: 44,
+                height: 5,
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade300,
+                  borderRadius: BorderRadius.circular(10),
+                ),
+              ),
+            ),
+            const SizedBox(height: 20),
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: primaryBlue.withValues(alpha: 0.12),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(
+                    Icons.auto_awesome,
+                    color: primaryBlue,
+                    size: 24,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                const Expanded(
+                  child: Text(
+                    'Hasil Analisis AI — Perbandingan CT Scan',
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 17,
+                      color: Colors.black87,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: primaryBlue.withValues(alpha: 0.05),
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: primaryBlue.withValues(alpha: 0.25)),
+              ),
+              child: Text(
+                analysisText,
+                style: const TextStyle(
+                  fontSize: 14,
+                  color: Colors.black87,
+                  height: 1.6,
+                ),
+              ),
+            ),
+            const SizedBox(height: 24),
+            SizedBox(
+              width: double.infinity,
+              height: 50,
+              child: ElevatedButton(
+                onPressed: () => Navigator.pop(ctx),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: primaryDark,
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  elevation: 0,
+                ),
+                child: const Text(
+                  'Tutup',
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Future<void> _uploadMri() async {
-    // 2. Cegah fungsi berjalan jika picker sedang aktif
-    if (_isPickerActive) return;
+    if (_isPickerActive || _isUploading) return;
     _isPickerActive = true;
 
     try {
       final XFile? image = await _picker.pickImage(
         source: ImageSource.gallery,
         imageQuality: 80,
+        maxWidth: 800,
+        maxHeight: 800,
       );
 
       if (image == null) {
-        _isPickerActive =
-            false; // Kembalikan state jika user batal memilih gambar
+        _isPickerActive = false;
+        return;
+      }
+
+      // Pre-processing client-side: validasi ekstensi & ukuran file
+      final ext = image.name.split('.').last.toLowerCase();
+      if (!_allowedExtensions.contains(ext)) {
+        _isPickerActive = false;
+        if (mounted) {
+          _showValidationErrorDialog(
+            'Format file .$ext tidak didukung. Silakan unggah gambar CT Scan berformat JPG, PNG, atau WEBP.',
+          );
+        }
+        return;
+      }
+
+      final bytes = await image.readAsBytes();
+      if (bytes.length > _maxFileBytes) {
+        _isPickerActive = false;
+        if (mounted) {
+          _showValidationErrorDialog(
+            'Ukuran gambar melebihi batas maksimal 5 MB. Silakan pilih file yang lebih kecil.',
+          );
+        }
         return;
       }
 
       setState(() => _isUploading = true);
 
-      final bytes = await image.readAsBytes();
       final base64Image = 'data:image/jpeg;base64,${base64Encode(bytes)}';
 
       final result = await MriService.uploadMriPhoto(
@@ -84,82 +284,182 @@ class _MriScreenState extends State<MriScreen> {
       );
       if (mounted) {
         if (result['status'] == 'success') {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Berhasil upload foto CT Scan'),
-              backgroundColor: primaryBlue,
-            ),
-          );
-          _fetchData();
+          await _fetchData();
         } else {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(result['message'] ?? 'Gagal upload'),
-              backgroundColor: Colors.redAccent,
-            ),
+          _showValidationErrorDialog(
+            result['message'] ??
+                'Gambar yang diunggah bukan kategori gambar medis CT Scan.',
           );
         }
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error: $e'),
-            backgroundColor: Colors.redAccent,
-          ),
-        );
+        _showValidationErrorDialog('Gagal mengunggah gambar: $e');
       }
     } finally {
-      // 3. Kembalikan state di blok finally agar selalu tereksekusi
       _isPickerActive = false;
       if (mounted) setState(() => _isUploading = false);
     }
   }
 
-  Widget _buildMriImage(String title, Map<String, dynamic>? data) {
+  Future<void> _startAnalysis() async {
+    if (_isAnalyzing) return;
+    if (_newestMri == null || _olderMri == null) {
+      _showValidationErrorDialog(
+        'Dibutuhkan minimal 2 gambar CT Scan (Terbaru & Sebelumnya) untuk menjalankan perbandingan AI. Silakan unggah gambar terlebih dahulu.',
+      );
+      return;
+    }
+
+    setState(() => _isAnalyzing = true);
+    try {
+      final res = await MriService.startMriAnalysis(widget.userUid);
+      if (!mounted) return;
+      if (res['status'] == 'success') {
+        final analysis = res['analysis']?.toString() ?? '';
+        setState(() => _aiAnalysis = analysis);
+        _showAnalysisBottomSheet(analysis);
+      } else {
+        _showValidationErrorDialog(
+          res['message'] ?? 'Gagal menjalankan analisis CT Scan.',
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isAnalyzing = false);
+    }
+  }
+
+  Widget _buildMriImage(
+    String title,
+    Map<String, dynamic>? data, {
+    bool isClickable = true,
+  }) {
+    final bool hasImage =
+        data != null &&
+        data['foto'] != null &&
+        data['foto'].toString().isNotEmpty;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          title,
-          style: const TextStyle(
-            fontWeight: FontWeight.bold,
-            fontSize: 16,
-            color: Colors.black87,
-          ),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Flexible(
+              child: Text(
+                title,
+                style: const TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 16,
+                  color: Colors.black87,
+                ),
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+            if (isClickable)
+              TextButton.icon(
+                onPressed: _isUploading ? null : _uploadMri,
+                icon: const Icon(Icons.upload_file, size: 16),
+                label: Text(
+                  hasImage ? 'Ganti / Upload Baru' : 'Klik untuk Upload',
+                ),
+                style: TextButton.styleFrom(
+                  foregroundColor: primaryBlue,
+                  visualDensity: VisualDensity.compact,
+                ),
+              ),
+          ],
         ),
         if (data != null && data['timestamp'] != null) ...[
-          const SizedBox(height: 4),
+          const SizedBox(height: 2),
           Text(
             _formatTimestamp(data['timestamp']),
             style: const TextStyle(fontSize: 12, color: Colors.grey),
           ),
         ],
-        const SizedBox(height: 12),
-        Container(
-          height: 220,
-          width: double.infinity,
-          decoration: BoxDecoration(
-            color: Colors.grey.shade100,
+        const SizedBox(height: 10),
+        Material(
+          color: Colors.transparent,
+          child: InkWell(
+            onTap: isClickable && !_isUploading ? _uploadMri : null,
             borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: Colors.grey.shade300),
-          ),
-          child:
-              data == null ||
-                  data['foto'] == null ||
-                  data['foto'].toString().isEmpty
-              ? const Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(Icons.broken_image, size: 60, color: Colors.grey),
-                    SizedBox(height: 8),
-                    Text(
-                      "Belum ada gambar",
-                      style: TextStyle(color: Colors.grey),
+            child: Container(
+              height: 220,
+              width: double.infinity,
+              decoration: BoxDecoration(
+                color: Colors.grey.shade100,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(
+                  color: isClickable
+                      ? primaryBlue.withValues(alpha: 0.4)
+                      : Colors.grey.shade300,
+                  width: 1.5,
+                ),
+              ),
+              child: !hasImage
+                  ? Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.add_photo_alternate_outlined,
+                          size: 56,
+                          color: isClickable ? primaryBlue : Colors.grey,
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          isClickable
+                              ? 'Ketuk area ini untuk mengunggah foto CT Scan'
+                              : 'Belum ada gambar sebelumnya',
+                          style: TextStyle(
+                            color: isClickable ? primaryBlue : Colors.grey,
+                            fontWeight: isClickable
+                                ? FontWeight.w600
+                                : FontWeight.normal,
+                          ),
+                        ),
+                      ],
+                    )
+                  : Stack(
+                      fit: StackFit.expand,
+                      children: [
+                        _buildImageFromBase64(data['foto']),
+                        if (isClickable)
+                          Positioned(
+                            right: 12,
+                            bottom: 12,
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 12,
+                                vertical: 6,
+                              ),
+                              decoration: BoxDecoration(
+                                color: Colors.black.withValues(alpha: 0.65),
+                                borderRadius: BorderRadius.circular(20),
+                              ),
+                              child: const Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(
+                                    Icons.touch_app,
+                                    color: Colors.white,
+                                    size: 14,
+                                  ),
+                                  SizedBox(width: 4),
+                                  Text(
+                                    'Ketuk untuk upload baru',
+                                    style: TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 11,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                      ],
                     ),
-                  ],
-                )
-              : _buildImageFromBase64(data['foto']),
+            ),
+          ),
         ),
       ],
     );
@@ -171,7 +471,7 @@ class _MriScreenState extends State<MriScreen> {
           ? base64String.split(',').last
           : base64String;
       return ClipRRect(
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(15),
         child: Image.memory(
           base64Decode(base64Data),
           fit: BoxFit.cover,
@@ -196,6 +496,13 @@ class _MriScreenState extends State<MriScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final bool canAnalyze = _newestMri != null && _olderMri != null;
+    final bool hasSavedAnalysis =
+        _aiAnalysis != null &&
+        _aiAnalysis!.isNotEmpty &&
+        !_aiAnalysis!.startsWith('Belum ada') &&
+        !_aiAnalysis!.startsWith('Upload satu');
+
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
@@ -221,86 +528,112 @@ class _MriScreenState extends State<MriScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    if (_aiAnalysis != null && _aiAnalysis!.isNotEmpty)
-                      Container(
-                        width: double.infinity,
-                        padding: const EdgeInsets.all(16),
-                        decoration: BoxDecoration(
-                          color: primaryBlue.withOpacity(0.05),
-                          borderRadius: BorderRadius.circular(16),
-                          border: Border.all(
-                            color: primaryBlue.withOpacity(0.3),
+                    _buildMriImage(
+                      'Hasil CT Scan Terbaru',
+                      _newestMri,
+                      isClickable: true,
+                    ),
+                    const SizedBox(height: 28),
+                    _buildMriImage(
+                      'Hasil CT Scan Sebelumnya',
+                      _olderMri,
+                      isClickable: true,
+                    ),
+                    const SizedBox(height: 32),
+
+                    // Tombol Upload CT Scan Terbaru
+                    SizedBox(
+                      width: double.infinity,
+                      height: 52,
+                      child: OutlinedButton.icon(
+                        onPressed: _isUploading ? null : _uploadMri,
+                        icon: _isUploading
+                            ? const SizedBox(
+                                width: 20,
+                                height: 20,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: primaryBlue,
+                                ),
+                              )
+                            : const Icon(Icons.cloud_upload_outlined),
+                        label: Text(
+                          _isUploading
+                              ? 'Mengunggah & Memvalidasi...'
+                              : 'Upload CT Scan Terbaru',
+                          style: const TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.bold,
                           ),
                         ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              children: const [
-                                Icon(
-                                  Icons.auto_awesome,
-                                  color: primaryBlue,
-                                  size: 20,
-                                ),
-                                SizedBox(width: 8),
-                                Text(
-                                  'Analisis Agent',
-                                  style: TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 16,
-                                    color: primaryBlue,
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 12),
-                            Text(
-                              _aiAnalysis!,
-                              style: const TextStyle(
-                                fontSize: 14,
-                                color: Colors.black87,
-                                height: 1.5,
-                              ),
-                            ),
-                          ],
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: primaryBlue,
+                          side: const BorderSide(
+                            color: primaryBlue,
+                            width: 1.5,
+                          ),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(14),
+                          ),
                         ),
                       ),
-                    const SizedBox(height: 20),
-                    _buildMriImage('Hasil CT Scan Terbaru', _newestMri),
-                    const SizedBox(height: 32),
-                    _buildMriImage('Hasil CT Scan Sebelumnya', _olderMri),
-                    const SizedBox(height: 48),
+                    ),
+                    const SizedBox(height: 14),
+
+                    // Tombol Manual Start Analysis
                     SizedBox(
                       width: double.infinity,
                       height: 54,
-                      child: ElevatedButton(
-                        onPressed: _isUploading ? null : _uploadMri,
+                      child: ElevatedButton.icon(
+                        onPressed: (_isAnalyzing || _isUploading)
+                            ? null
+                            : _startAnalysis,
+                        icon: _isAnalyzing
+                            ? const SizedBox(
+                                width: 22,
+                                height: 22,
+                                child: CircularProgressIndicator(
+                                  color: Colors.white,
+                                  strokeWidth: 2.5,
+                                ),
+                              )
+                            : const Icon(Icons.auto_awesome),
+                        label: Text(
+                          _isAnalyzing
+                              ? 'AI Sedang Menganalisis...'
+                              : 'Start Analysis',
+                          style: const TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: primaryBlue,
+                          backgroundColor: canAnalyze
+                              ? primaryDark
+                              : Colors.grey.shade400,
                           foregroundColor: Colors.white,
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(14),
                           ),
                           elevation: 0,
                         ),
-                        child: _isUploading
-                            ? const SizedBox(
-                                width: 24,
-                                height: 24,
-                                child: CircularProgressIndicator(
-                                  color: Colors.white,
-                                  strokeWidth: 2.5,
-                                ),
-                              )
-                            : const Text(
-                                'Upload CT Scan Terbaru',
-                                style: TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
                       ),
                     ),
+
+                    if (hasSavedAnalysis) ...[
+                      const SizedBox(height: 14),
+                      Center(
+                        child: TextButton.icon(
+                          onPressed: () =>
+                              _showAnalysisBottomSheet(_aiAnalysis!),
+                          icon: const Icon(Icons.visibility_outlined, size: 18),
+                          label: const Text('Lihat Hasil Analisis Terakhir'),
+                          style: TextButton.styleFrom(
+                            foregroundColor: primaryBlue,
+                          ),
+                        ),
+                      ),
+                    ],
                     const SizedBox(height: 40),
                   ],
                 ),

@@ -11,9 +11,18 @@ plugins {
 android {
     namespace = "com.example.agent_doctor"
     compileSdk = flutter.compileSdkVersion
-    ndkVersion = flutter.ndkVersion
+    // Gunakan NDK r30+ untuk dukungan penuh 16 KB page size pada Android 15+ (termasuk kompatibilitas libsqlcipher & native libs)
+    ndkVersion = "30.0.14904198"
+
+    packaging {
+        jniLibs {
+            // Wajib false agar native libraries (.so) seperti libsqlcipher.so di-align pada batas 16 KB (16384 bytes) di dalam APK/AAB
+            useLegacyPackaging = false
+        }
+    }
 
     compileOptions {
+        isCoreLibraryDesugaringEnabled = true
         sourceCompatibility = JavaVersion.VERSION_11
         targetCompatibility = JavaVersion.VERSION_11
     }
@@ -31,6 +40,13 @@ android {
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
+
+        externalNativeBuild {
+            cmake {
+                arguments("-DANDROID_SUPPORT_FLEXIBLE_PAGE_SIZES=ON")
+                cppFlags("-Wl,-z,max-page-size=16384")
+            }
+        }
     }
 
     buildTypes {
@@ -44,4 +60,23 @@ android {
 
 flutter {
     source = "../.."
+}
+
+// Resolusi otomatis jika ada transitive dependency ke android-database-sqlcipher lama (4 KB page size)
+// ke sqlcipher-android >= 4.6.1 yang sudah mendukung 16 KB page size
+configurations.all {
+    resolutionStrategy.eachDependency {
+        if (requested.group == "net.zetetic" && requested.name == "android-database-sqlcipher") {
+            useTarget("net.zetetic:sqlcipher-android:4.6.1")
+            because("Fix Android 15+ 16 KB page size compatibility for libsqlcipher.so")
+        }
+        if (requested.group == "net.zetetic" && requested.name == "sqlcipher-android") {
+            useVersion("4.6.1")
+            because("Ensure 16 KB page size aligned libsqlcipher.so")
+        }
+    }
+}
+
+dependencies {
+    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.4")
 }

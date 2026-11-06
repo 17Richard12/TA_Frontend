@@ -4,6 +4,9 @@ import 'package:lungs_assistant_agent/services/oxygen_service.dart';
 import 'package:lungs_assistant_agent/services/youtube_service.dart';
 import 'package:lungs_assistant_agent/services/smoke_service.dart';
 import 'package:lungs_assistant_agent/services/activity_service.dart';
+import 'package:lungs_assistant_agent/services/auth_service.dart';
+import 'package:lungs_assistant_agent/services/notification_service.dart';
+import 'package:lungs_assistant_agent/state/smoke_sync.dart';
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:fl_chart/fl_chart.dart';
@@ -11,8 +14,14 @@ import 'package:fl_chart/fl_chart.dart';
 class HomeScreen extends StatefulWidget {
   final String name;
   final String userUid;
+  final VoidCallback? onShowAppTour;
 
-  const HomeScreen({super.key, required this.name, required this.userUid});
+  const HomeScreen({
+    super.key,
+    required this.name,
+    required this.userUid,
+    this.onShowAppTour,
+  });
 
   @override
   State<HomeScreen> createState() => _HomeScreenState();
@@ -21,8 +30,10 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   int _selectedTab = 0;
 
-  // State untuk Smoke
+  // State untuk Smoke & Batas Rendah/Tinggi
   int _smokeCount = 0;
+  int _smokeLimitLow = 5;
+  int _smokeLimitHigh = 10;
   bool _smokeLoading = true;
 
   // State untuk Smoke Report (Grafik)
@@ -32,10 +43,6 @@ class _HomeScreenState extends State<HomeScreen> {
   // State untuk Activity Report (Grafik Kanan)
   List<dynamic> _weeklyActivityReport = [];
   bool _activityReportLoading = true;
-
-  // State untuk Oxygen
-  double _oxygenLevel = 0.0;
-  bool _oxygenLoading = true;
 
   int _currentStreak = 0;
   bool _streakLoading = true;
@@ -70,10 +77,238 @@ class _HomeScreenState extends State<HomeScreen> {
     super.initState();
     _loadActivities(); // Load Activities pertama kali
     _loadOxygenLevel();
+    _loadUserSmokeLimits();
     _loadSmokeCount();
     _loadWeeklyReport();
     _loadWeeklyActivityReport();
     _loadStreak();
+  }
+
+  Future<void> _loadUserSmokeLimits() async {
+    final res = await AuthService().getUser(widget.userUid);
+    if (mounted && res['status'] == 'success') {
+      final data = res['data'] as Map<String, dynamic>? ?? {};
+      setState(() {
+        _smokeLimitLow =
+            int.tryParse((data['smoke_limit_low'] ?? 5).toString()) ?? 5;
+        _smokeLimitHigh =
+            int.tryParse((data['smoke_limit_high'] ?? 10).toString()) ?? 10;
+      });
+    }
+  }
+
+  void _showAlertBottomSheet({
+    required String title,
+    required String message,
+    bool isError = true,
+  }) {
+    if (!mounted) return;
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => Container(
+        padding: const EdgeInsets.fromLTRB(24, 20, 24, 28),
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 44,
+              height: 5,
+              decoration: BoxDecoration(
+                color: Colors.grey.shade300,
+                borderRadius: BorderRadius.circular(10),
+              ),
+            ),
+            const SizedBox(height: 20),
+            Container(
+              width: 60,
+              height: 60,
+              decoration: BoxDecoration(
+                color: (isError ? Colors.redAccent : Colors.orange).withValues(
+                  alpha: 0.12,
+                ),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                isError
+                    ? Icons.error_outline_rounded
+                    : Icons.warning_amber_rounded,
+                color: isError ? Colors.redAccent : Colors.orange,
+                size: 34,
+              ),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              title,
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: Colors.black87,
+              ),
+            ),
+            const SizedBox(height: 10),
+            Text(
+              message,
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                fontSize: 14,
+                color: Colors.black54,
+                height: 1.5,
+              ),
+            ),
+            const SizedBox(height: 24),
+            SizedBox(
+              width: double.infinity,
+              height: 48,
+              child: ElevatedButton(
+                onPressed: () => Navigator.pop(ctx),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: isError ? Colors.redAccent : Colors.orange,
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  elevation: 0,
+                ),
+                child: const Text(
+                  'MENGERTI',
+                  style: TextStyle(fontWeight: FontWeight.bold),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showAddSmokeConfirmationBottomSheet() {
+    final nextCount = _smokeCount + 1;
+    final bool willExceedHigh =
+        _smokeLimitHigh > 0 && nextCount >= _smokeLimitHigh;
+    final bool willReachLow =
+        _smokeLimitLow > 0 && nextCount >= _smokeLimitLow;
+
+    String warningNote =
+        'Coba selesaikan daily activities-mu untuk mengalihkan rasa ingin merokok.\n\nApakah kamu yakin ingin tetap menambah jumlah rokok?';
+    if (willExceedHigh) {
+      warningNote =
+          'PERINGATAN BATAS TINGGI! Menambah rokok ini akan membuat konsumsimu menjadi $nextCount batang (melewati/mencapai batas tinggi $_smokeLimitHigh batang).\n\nSangat disarankan untuk berhenti merokok hari ini dan lakukan aktivitas sehat.';
+    } else if (willReachLow) {
+      warningNote =
+          'Peringatan Batas Rendah: Menambah rokok ini akan membuat konsumsimu mencapai $nextCount batang (batas rendah: $_smokeLimitLow batang, batas tinggi: $_smokeLimitHigh batang).\n\nYuk alihkan dengan daily activities!';
+    }
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (ctx) => Container(
+        padding: const EdgeInsets.fromLTRB(24, 20, 24, 28),
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 44,
+              height: 5,
+              decoration: BoxDecoration(
+                color: Colors.grey.shade300,
+                borderRadius: BorderRadius.circular(10),
+              ),
+            ),
+            const SizedBox(height: 20),
+            Container(
+              width: 64,
+              height: 64,
+              decoration: BoxDecoration(
+                color: (willExceedHigh ? Colors.redAccent : Colors.orange)
+                    .withValues(alpha: 0.12),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                Icons.warning_amber_rounded,
+                color: willExceedHigh ? Colors.redAccent : Colors.orange,
+                size: 36,
+              ),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              willExceedHigh ? 'Batas Tinggi Rokok! 🚨' : 'Tunggu Dulu! ✋',
+              style: const TextStyle(
+                fontWeight: FontWeight.bold,
+                fontSize: 19,
+                color: Colors.black87,
+              ),
+            ),
+            const SizedBox(height: 12),
+            Text(
+              warningNote,
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                fontSize: 14,
+                color: Colors.black87,
+                height: 1.5,
+              ),
+            ),
+            const SizedBox(height: 24),
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton(
+                    onPressed: () => Navigator.pop(ctx),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: Colors.grey.shade700,
+                      side: BorderSide(color: Colors.grey.shade300),
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                    ),
+                    child: const Text(
+                      'BATAL',
+                      style: TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: ElevatedButton(
+                    onPressed: () {
+                      Navigator.pop(ctx);
+                      _updateSmokeCount(_smokeCount + 1);
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: willExceedHigh
+                          ? Colors.redAccent
+                          : Colors.orange,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                      elevation: 0,
+                    ),
+                    child: const Text(
+                      'TETAP TAMBAH',
+                      style: TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   // --- FETCH DATA ACTIVITIES ---
@@ -111,6 +346,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Future<void> _loadWeeklyReport() async {
     setState(() => _reportLoading = true);
+    await SmokeSync.instance.waitForPendingWrites();
     final report = await SmokeService.getWeeklyReport(
       widget.userUid,
       _todayTimestampForReport,
@@ -158,16 +394,15 @@ class _HomeScreenState extends State<HomeScreen> {
       newStatus,
     );
 
-    // 3. Jika gagal, kembalikan ke status awal dan tampilkan error
+    // 3. Jika gagal, kembalikan ke status awal dan tampilkan BottomSheet error
     if (!success && mounted) {
       setState(() {
         _activityList[index]['done'] = currentStatus;
       });
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Gagal memperbarui status aktivitas'),
-          backgroundColor: Colors.red,
-        ),
+      _showAlertBottomSheet(
+        title: 'Gagal Memperbarui Aktivitas',
+        message:
+            'Status aktivitas gagal disimpan ke server. Periksa koneksi internetmu lalu coba kembali.',
       );
     } else {
       // Jika berhasil, refresh grafik aktivitas DAN hitungan streak
@@ -178,23 +413,19 @@ class _HomeScreenState extends State<HomeScreen> {
 
   // --- FUNGSI SMOKE & OXYGEN ---
   Future<void> _loadOxygenLevel() async {
-    setState(() => _oxygenLoading = true);
     await OxygenService.requestPermission();
-    final level = await OxygenService.getLatestOxygenLevel();
-    if (mounted) {
-      setState(() {
-        _oxygenLevel = level;
-        _oxygenLoading = false;
-      });
-    }
+    await OxygenService.getLatestOxygenLevel();
   }
 
   Future<void> _loadSmokeCount() async {
     setState(() => _smokeLoading = true);
+    // Pastikan tidak membaca data basi saat masih ada penyimpanan yang berjalan
+    await SmokeSync.instance.waitForPendingWrites();
     final count = await SmokeService.getSmokeCount(
       widget.userUid,
       _todayTimestamp,
     );
+    SmokeSync.instance.seed(widget.userUid, _todayTimestamp, count);
     if (mounted) {
       setState(() {
         _smokeCount = count;
@@ -204,40 +435,44 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _updateSmokeCount(int newCount) async {
-    final oldCount = _smokeCount;
+    // Optimistic UI: angka langsung berubah di Home
     setState(() => _smokeCount = newCount);
 
-    final success = await SmokeService.postSmokeCount(
+    // Penulisan diserialisasi oleh SmokeSync agar urutan tap cepat tetap benar
+    // dan halaman Report dapat menunggu sampai data benar-benar tersimpan.
+    final success = await SmokeSync.instance.setCount(
       widget.userUid,
       _todayTimestamp,
       newCount,
     );
 
-    if (!success && mounted) {
-      setState(() => _smokeCount = oldCount);
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Gagal menyimpan jumlah rokok ke server')),
+    if (!mounted) return;
+    if (!success) {
+      final confirmed = SmokeSync.instance.confirmedCountFor(
+        widget.userUid,
+        _todayTimestamp,
+      );
+      setState(() => _smokeCount = confirmed ?? _smokeCount);
+      _showAlertBottomSheet(
+        title: 'Gagal Menyimpan Smoke Count',
+        message:
+            'Jumlah rokok gagal disimpan ke server. Periksa koneksi internetmu lalu coba lagi.',
       );
     } else {
-      _loadWeeklyReport();
+      if (!SmokeSync.instance.hasPendingWrites) {
+        _loadWeeklyReport();
+      }
+      // Evaluasi notifikasi peringatan batas rendah / batas tinggi
+      await NotificationService.instance.checkAndNotifySmokeLimit(
+        userId: widget.userUid,
+        dateStr: _todayTimestamp,
+        smokeCount: newCount,
+        lowLimit: _smokeLimitLow,
+        highLimit: _smokeLimitHigh,
+      );
     }
   }
 
-  Color _oxygenColor(double value) {
-    if (value == 0) return Colors.grey.shade300;
-    if (value >= 95) return const Color(0xFF2F60CC);
-    if (value >= 90) return Colors.orange;
-    return Colors.red;
-  }
-
-  String _oxygenStatus(double value) {
-    if (value == 0) return 'No Data';
-    if (value >= 95) return 'Normal';
-    if (value >= 90) return 'Rendah';
-    return 'Berbahaya';
-  }
-
-  // --- GRAFIK GABUNGAN: SMOKE & ACTIVITY ---
   // --- GRAFIK GABUNGAN: SMOKE & ACTIVITY ---
   Widget _buildCombinedChart() {
     // Tunggu sampai kedua API selesai
@@ -319,7 +554,7 @@ class _HomeScreenState extends State<HomeScreen> {
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.06),
+            color: Colors.black.withValues(alpha: 0.06),
             blurRadius: 10,
             offset: const Offset(0, 4),
           ),
@@ -448,7 +683,7 @@ class _HomeScreenState extends State<HomeScreen> {
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.06),
+            color: Colors.black.withValues(alpha: 0.06),
             blurRadius: 10,
             offset: const Offset(0, 4),
           ),
@@ -595,23 +830,35 @@ class _HomeScreenState extends State<HomeScreen> {
                     child: const Icon(Icons.person, color: Colors.white),
                   ),
                   const SizedBox(width: 14),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text(
-                        'Welcome',
-                        style: TextStyle(color: Colors.white),
-                      ),
-                      Text(
-                        '${widget.name} !',
-                        style: const TextStyle(
-                          color: accentBlue,
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'Welcome',
+                          style: TextStyle(color: Colors.white),
                         ),
-                      ),
-                    ],
+                        Text(
+                          '${widget.name} !',
+                          style: const TextStyle(
+                            color: accentBlue,
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ],
+                    ),
                   ),
+                  if (widget.onShowAppTour != null)
+                    IconButton(
+                      onPressed: widget.onShowAppTour,
+                      tooltip: 'Panduan Aplikasi (App Tour)',
+                      icon: const Icon(
+                        Icons.help_outline_rounded,
+                        color: Colors.white,
+                      ),
+                    ),
                 ],
               ),
             ),
@@ -632,7 +879,7 @@ class _HomeScreenState extends State<HomeScreen> {
                           borderRadius: BorderRadius.circular(20),
                           boxShadow: [
                             BoxShadow(
-                              color: Colors.black.withOpacity(0.06),
+                              color: Colors.black.withValues(alpha: 0.06),
                               blurRadius: 10,
                               offset: const Offset(0, 4),
                             ),
@@ -683,97 +930,64 @@ class _HomeScreenState extends State<HomeScreen> {
                                       ),
                                       const SizedBox(width: 16),
                                       GestureDetector(
-                                        onTap: () {
-                                          showDialog(
-                                            context: context,
-                                            builder: (BuildContext context) {
-                                              return AlertDialog(
-                                                shape: RoundedRectangleBorder(
-                                                  borderRadius:
-                                                      BorderRadius.circular(20),
-                                                ),
-                                                title: const Row(
-                                                  children: [
-                                                    Icon(
-                                                      Icons
-                                                          .warning_amber_rounded,
-                                                      color: Colors.orange,
-                                                      size: 28,
-                                                    ),
-                                                    SizedBox(width: 10),
-                                                    Text(
-                                                      'Tunggu Dulu! ✋',
-                                                      style: TextStyle(
-                                                        fontWeight:
-                                                            FontWeight.bold,
-                                                        fontSize: 18,
-                                                      ),
-                                                    ),
-                                                  ],
-                                                ),
-                                                content: const Text(
-                                                  'Coba selesaikan daily activities-mu untuk mengalihkan rasa ingin merokok.\n\nApakah kamu yakin ingin tetap menambah jumlah rokok?',
-                                                  style: TextStyle(
-                                                    fontSize: 14,
-                                                    color: Colors.black87,
-                                                    height: 1.5,
-                                                  ),
-                                                ),
-                                                actions: [
-                                                  TextButton(
-                                                    onPressed: () {
-                                                      Navigator.pop(
-                                                        context,
-                                                      ); // Tutup dialog tanpa menambah
-                                                    },
-                                                    child: const Text(
-                                                      'BATAL',
-                                                      style: TextStyle(
-                                                        color: Colors.grey,
-                                                        fontWeight:
-                                                            FontWeight.bold,
-                                                      ),
-                                                    ),
-                                                  ),
-                                                  ElevatedButton(
-                                                    onPressed: () {
-                                                      Navigator.pop(
-                                                        context,
-                                                      ); // Tutup dialog
-                                                      _updateSmokeCount(
-                                                        _smokeCount + 1,
-                                                      ); // Tambah jumlah rokok
-                                                    },
-                                                    style: ElevatedButton.styleFrom(
-                                                      backgroundColor:
-                                                          Colors.orange,
-                                                      foregroundColor:
-                                                          Colors.white,
-                                                      shape: RoundedRectangleBorder(
-                                                        borderRadius:
-                                                            BorderRadius.circular(
-                                                              12,
-                                                            ),
-                                                      ),
-                                                      elevation: 0,
-                                                    ),
-                                                    child: const Text(
-                                                      'TETAP TAMBAH',
-                                                      style: TextStyle(
-                                                        fontWeight:
-                                                            FontWeight.bold,
-                                                      ),
-                                                    ),
-                                                  ),
-                                                ],
-                                              );
-                                            },
-                                          );
-                                        },
+                                        onTap:
+                                            _showAddSmokeConfirmationBottomSheet,
                                         child: _smallCircleButton(Icons.add),
                                       ),
                                     ],
                                   ),
+                            const SizedBox(height: 12),
+                            Padding(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 16,
+                              ),
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 10,
+                                      vertical: 4,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: Colors.orange.withValues(
+                                        alpha: 0.1,
+                                      ),
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
+                                    child: Text(
+                                      'Batas Rendah: $_smokeLimitLow btg',
+                                      style: const TextStyle(
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.w600,
+                                        color: Colors.orange,
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 10,
+                                      vertical: 4,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: Colors.redAccent.withValues(
+                                        alpha: 0.1,
+                                      ),
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
+                                    child: Text(
+                                      'Batas Tinggi: $_smokeLimitHigh btg',
+                                      style: const TextStyle(
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.w600,
+                                        color: Colors.redAccent,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
                           ],
                         ),
                       ),
@@ -902,7 +1116,7 @@ class _HomeScreenState extends State<HomeScreen> {
             borderRadius: BorderRadius.circular(12),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(0.05),
+                color: Colors.black.withValues(alpha: 0.05),
                 blurRadius: 6,
                 offset: const Offset(0, 3),
               ),
@@ -913,8 +1127,8 @@ class _HomeScreenState extends State<HomeScreen> {
               padding: const EdgeInsets.all(10),
               decoration: BoxDecoration(
                 color: isDone
-                    ? Colors.green.withOpacity(0.1)
-                    : accentBlue.withOpacity(0.1),
+                    ? Colors.green.withValues(alpha: 0.1)
+                    : accentBlue.withValues(alpha: 0.1),
                 shape: BoxShape.circle,
               ),
               child: Icon(
@@ -945,8 +1159,9 @@ class _HomeScreenState extends State<HomeScreen> {
 
   // --- UI NEWS ---
   Widget _buildNewsSection() {
-    if (_newsFuture == null)
+    if (_newsFuture == null) {
       return const Center(child: Text("Tap News to load data"));
+    }
 
     return FutureBuilder<List<dynamic>>(
       future: _newsFuture,
@@ -978,7 +1193,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   borderRadius: BorderRadius.circular(12),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withOpacity(0.05),
+                      color: Colors.black.withValues(alpha: 0.05),
                       blurRadius: 6,
                       offset: const Offset(0, 3),
                     ),
@@ -1048,8 +1263,9 @@ class _HomeScreenState extends State<HomeScreen> {
 
   // --- UI VIDEOS ---
   Widget _buildVideoSection() {
-    if (_videoFuture == null)
+    if (_videoFuture == null) {
       return const Center(child: Text("Tap Videos to load data"));
+    }
 
     return FutureBuilder<List<dynamic>>(
       future: _videoFuture,
@@ -1081,7 +1297,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   borderRadius: BorderRadius.circular(12),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withOpacity(0.05),
+                      color: Colors.black.withValues(alpha: 0.05),
                       blurRadius: 6,
                       offset: const Offset(0, 3),
                     ),
@@ -1122,57 +1338,6 @@ class _HomeScreenState extends State<HomeScreen> {
       },
     );
   }
-}
-
-// Custom painter untuk gauge setengah lingkaran
-class _OxygenGaugePainter extends CustomPainter {
-  final double value; // 0 - 100
-  final Color color;
-
-  _OxygenGaugePainter({required this.value, required this.color});
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final cx = size.width / 2;
-    final cy = size.height * 0.9;
-    final radius = size.width * 0.42;
-    const strokeWidth = 14.0;
-
-    final bgPaint = Paint()
-      ..color = Colors.grey.shade200
-      ..strokeWidth = strokeWidth
-      ..strokeCap = StrokeCap.round
-      ..style = PaintingStyle.stroke;
-
-    final fgPaint = Paint()
-      ..color = color
-      ..strokeWidth = strokeWidth
-      ..strokeCap = StrokeCap.round
-      ..style = PaintingStyle.stroke;
-
-    // Background arc (setengah lingkaran)
-    canvas.drawArc(
-      Rect.fromCircle(center: Offset(cx, cy), radius: radius),
-      pi,
-      pi,
-      false,
-      bgPaint,
-    );
-
-    // Foreground arc (berdasarkan nilai)
-    final sweep = pi * (value / 100).clamp(0.0, 1.0);
-    canvas.drawArc(
-      Rect.fromCircle(center: Offset(cx, cy), radius: radius),
-      pi,
-      sweep,
-      false,
-      fgPaint,
-    );
-  }
-
-  @override
-  bool shouldRepaint(_OxygenGaugePainter old) =>
-      old.value != value || old.color != color;
 }
 
 // Custom painter untuk membuat lingkaran putus-putus (dashed outline)

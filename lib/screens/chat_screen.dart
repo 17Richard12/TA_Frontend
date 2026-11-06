@@ -5,6 +5,7 @@ import 'package:lungs_assistant_agent/services/chat_service.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:http/http.dart' as http;
+import 'package:url_launcher/url_launcher.dart';
 
 class ChatScreen extends StatefulWidget {
   final String userUid;
@@ -277,7 +278,7 @@ class _ChatScreenState extends State<ChatScreen> {
                 color: Colors.white,
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withOpacity(0.05),
+                    color: Colors.black.withValues(alpha: 0.05),
                     blurRadius: 10,
                     offset: const Offset(0, -2),
                   ),
@@ -301,7 +302,7 @@ class _ChatScreenState extends State<ChatScreen> {
                         style: const TextStyle(fontSize: 15),
                         decoration: InputDecoration(
                           hintText: _isLoading
-                              ? 'Menunggu respons...'
+                              ? 'AI sedang menganalisis...'
                               : 'Ketik pesan...',
                           hintStyle: const TextStyle(color: Colors.black45),
                           contentPadding: const EdgeInsets.symmetric(
@@ -368,7 +369,7 @@ class _ChatScreenState extends State<ChatScreen> {
                   : null,
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.07),
+                  color: Colors.black.withValues(alpha: 0.07),
                   blurRadius: 6,
                   offset: const Offset(0, 2),
                 ),
@@ -385,11 +386,29 @@ class _ChatScreenState extends State<ChatScreen> {
                   )
                 : MarkdownBody(
                     data: text,
+                    onTapLink: (text, href, title) async {
+                      if (href != null && href.isNotEmpty) {
+                        final uri = Uri.tryParse(href);
+                        if (uri != null && await canLaunchUrl(uri)) {
+                          await launchUrl(
+                            uri,
+                            mode: LaunchMode.externalApplication,
+                          );
+                        }
+                      }
+                    },
                     styleSheet: MarkdownStyleSheet(
                       p: const TextStyle(
                         color: Colors.white,
                         fontSize: 15,
                         fontWeight: FontWeight.w500,
+                      ),
+                      a: const TextStyle(
+                        color: Color(0xFFBFDBFE),
+                        fontSize: 14,
+                        fontWeight: FontWeight.bold,
+                        decoration: TextDecoration.underline,
+                        decorationColor: Color(0xFFBFDBFE),
                       ),
                       strong: const TextStyle(
                         color: Colors.white,
@@ -440,17 +459,29 @@ class _ChatScreenState extends State<ChatScreen> {
         mainAxisAlignment: MainAxisAlignment.start,
         children: [
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 18),
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
             decoration: BoxDecoration(
               color: responseBubble,
               borderRadius: BorderRadius.circular(28),
             ),
             child: Row(
               mainAxisSize: MainAxisSize.min,
-              children: List.generate(
-                3,
-                (i) => _DotPulse(delay: Duration(milliseconds: i * 200)),
-              ),
+              children: [
+                const Text(
+                  'AI sedang menganalisis',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 14,
+                    fontStyle: FontStyle.italic,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                ...List.generate(
+                  3,
+                  (i) => _DotPulse(delay: Duration(milliseconds: i * 200)),
+                ),
+              ],
             ),
           ),
         ],

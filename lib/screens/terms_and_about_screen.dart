@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:lungs_assistant_agent/screens/main_screen.dart';
 import 'package:lungs_assistant_agent/screens/onboarding_screen.dart';
 
 class TermsAndAboutScreen extends StatefulWidget {
@@ -150,7 +149,7 @@ class _TermsAndAboutScreenState extends State<TermsAndAboutScreen> {
                         color: Colors.white,
                         boxShadow: [
                           BoxShadow(
-                            color: Colors.black.withOpacity(0.05),
+                            color: Colors.black.withValues(alpha: 0.05),
                             offset: const Offset(0, -4),
                             blurRadius: 10,
                           ),

@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:lungs_assistant_agent/screens/main_screen.dart';
 import 'package:lungs_assistant_agent/services/auth_service.dart';
+import 'package:lungs_assistant_agent/services/session_service.dart';
+import 'package:lungs_assistant_agent/state/smoke_sync.dart';
 
 class OnboardingScreen extends StatefulWidget {
   final String uid;
@@ -23,6 +25,12 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   final AuthService _authService = AuthService();
 
   final TextEditingController _smokeController = TextEditingController();
+  final TextEditingController _smokeLimitLowController = TextEditingController(
+    text: '5',
+  );
+  final TextEditingController _smokeLimitHighController = TextEditingController(
+    text: '10',
+  );
   final TextEditingController _birthController = TextEditingController();
   final TextEditingController _heightController = TextEditingController();
   final TextEditingController _weightController = TextEditingController();
@@ -36,6 +44,8 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   @override
   void dispose() {
     _smokeController.dispose();
+    _smokeLimitLowController.dispose();
+    _smokeLimitHighController.dispose();
     _birthController.dispose();
     _heightController.dispose();
     _weightController.dispose();
@@ -46,7 +56,24 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
 
   Future<void> _submitData() async {
     if (_formKey.currentState!.validate()) {
+      if (_selectedGender == null || _selectedBloodType == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Harap lengkapi Gender dan Golongan Darah'),
+            backgroundColor: Colors.red,
+          ),
+        );
+        return;
+      }
+
       setState(() => _isLoading = true);
+
+      final now = DateTime.now();
+      final todayStr =
+          "${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}";
+      final initialSmoke = int.tryParse(_smokeController.text) ?? 0;
+      final limitLow = int.tryParse(_smokeLimitLowController.text) ?? 5;
+      final limitHigh = int.tryParse(_smokeLimitHighController.text) ?? 10;
 
       final payload = {
         "birth": _birthController.text,
@@ -56,7 +83,10 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
         "weight": double.tryParse(_weightController.text) ?? 0.0,
         "phone": _phoneController.text,
         "history": _historyController.text,
-        "initial_smoke_count": int.tryParse(_smokeController.text) ?? 0,
+        "initial_smoke_count": initialSmoke,
+        "smoke_limit_low": limitLow,
+        "smoke_limit_high": limitHigh,
+        "timestamp": todayStr,
       };
 
       final result = await _authService.submitOnboarding(widget.uid, payload);
@@ -64,7 +94,10 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       if (mounted) {
         setState(() => _isLoading = false);
         if (result['status'] == 'success') {
-          Navigator.pushReplacement(
+          await SessionService.setProfileCompleted(true);
+          SmokeSync.instance.seed(widget.uid, todayStr, initialSmoke);
+          if (!mounted) return;
+          Navigator.pushAndRemoveUntil(
             context,
             MaterialPageRoute(
               builder: (context) => MainScreen(
@@ -73,6 +106,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                 role: widget.role,
               ),
             ),
+            (route) => false,
           );
         } else {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -141,6 +175,66 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                         validator: (v) => (v == null || v.isEmpty)
                             ? 'Wajib diisi (isi 0 jika tidak merokok)'
                             : null,
+                      ),
+                      const SizedBox(height: 20),
+
+                      // BATAS RENDAH & BATAS TINGGI SMOKE COUNT
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                _buildLabel('Batas Rendah Rokok'),
+                                const SizedBox(height: 8),
+                                _buildTextField(
+                                  controller: _smokeLimitLowController,
+                                  hint: '5',
+                                  icon: Icons.warning_amber_rounded,
+                                  keyboardType: TextInputType.number,
+                                  validator: (v) {
+                                    final val = int.tryParse(v ?? '');
+                                    if (val == null || val < 0) {
+                                      return 'Wajib diisi';
+                                    }
+                                    return null;
+                                  },
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(width: 16),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                _buildLabel('Batas Tinggi Rokok'),
+                                const SizedBox(height: 8),
+                                _buildTextField(
+                                  controller: _smokeLimitHighController,
+                                  hint: '10',
+                                  icon: Icons.report_problem_outlined,
+                                  keyboardType: TextInputType.number,
+                                  validator: (v) {
+                                    final high = int.tryParse(v ?? '');
+                                    final low =
+                                        int.tryParse(
+                                          _smokeLimitLowController.text,
+                                        ) ??
+                                        0;
+                                    if (high == null || high <= 0) {
+                                      return 'Wajib > 0';
+                                    }
+                                    if (high < low) {
+                                      return 'Harus >= batas rendah';
+                                    }
+                                    return null;
+                                  },
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
                       ),
                       const SizedBox(height: 20),
 
@@ -213,6 +307,13 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                                   hint: '170',
                                   icon: Icons.height,
                                   keyboardType: TextInputType.number,
+                                  validator: (v) {
+                                    final val = double.tryParse(v ?? '');
+                                    if (val == null || val <= 0) {
+                                      return 'Wajib diisi';
+                                    }
+                                    return null;
+                                  },
                                 ),
                               ],
                             ),
@@ -229,6 +330,13 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                                   hint: '65',
                                   icon: Icons.monitor_weight_outlined,
                                   keyboardType: TextInputType.number,
+                                  validator: (v) {
+                                    final val = double.tryParse(v ?? '');
+                                    if (val == null || val <= 0) {
+                                      return 'Wajib diisi';
+                                    }
+                                    return null;
+                                  },
                                 ),
                               ],
                             ),
@@ -323,9 +431,15 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     required void Function(Object?) onChanged,
   }) {
     return DropdownButtonFormField(
-      value: value,
+      initialValue: value,
+      isExpanded: true,
       items: items
-          .map((e) => DropdownMenuItem(value: e, child: Text(e)))
+          .map(
+            (e) => DropdownMenuItem(
+              value: e,
+              child: Text(e, overflow: TextOverflow.ellipsis),
+            ),
+          )
           .toList(),
       onChanged: onChanged,
       decoration: InputDecoration(

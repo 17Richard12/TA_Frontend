@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:flutter/foundation.dart';
 import 'package:lungs_assistant_agent/constants.dart';
 import 'package:http/http.dart' as http;
 
@@ -30,10 +31,10 @@ class ActivityService {
           return jsonResponse['data'];
         }
       }
-      print('Gagal load activities: ${response.body}');
+      debugPrint('Gagal load activities: ${response.body}');
       return null;
     } catch (e) {
-      print('Error getDailyActivity: $e');
+      debugPrint('Error getDailyActivity: $e');
       return null;
     }
   }
@@ -56,13 +57,13 @@ class ActivityService {
       if (response.statusCode == 200) {
         return true;
       } else {
-        print(
+        debugPrint(
           'Gagal update checklist: ${response.statusCode} - ${response.body}',
         );
         return false;
       }
     } catch (e) {
-      print('Error update checklist: $e');
+      debugPrint('Error update checklist: $e');
       return false;
     }
   }
@@ -84,10 +85,10 @@ class ActivityService {
           return jsonResponse['data'] ?? [];
         }
       }
-      print('Gagal load activity report: ${response.body}');
+      debugPrint('Gagal load activity report: ${response.body}');
       return [];
     } catch (e) {
-      print('Error getWeeklyActivityReport: $e');
+      debugPrint('Error getWeeklyActivityReport: $e');
       return [];
     }
   }
@@ -106,7 +107,7 @@ class ActivityService {
       }
       return 0;
     } catch (e) {
-      print('Error get streak: $e');
+      debugPrint('Error get streak: $e');
       return 0;
     }
   }

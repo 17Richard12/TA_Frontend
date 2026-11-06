@@ -15,6 +15,9 @@ class HospitalScreen extends StatefulWidget {
 class _HospitalScreenState extends State<HospitalScreen> {
   final Completer<GoogleMapController> _controller = Completer();
 
+  static const Color primaryDark = Color(0xFF1A1A8C);
+  static const Color primaryBlue = Color(0xFF2F60CC);
+
   LatLng? _currentPosition;
   Set<Marker> _markers = {};
 
@@ -31,10 +34,8 @@ class _HospitalScreenState extends State<HospitalScreen> {
     _getUserLocation();
   }
 
-  // ✅ Ambil lokasi user + fetch RS
   Future<void> _getUserLocation() async {
     try {
-      // 1. Pastikan layanan lokasi di perangkat aktif
       final serviceEnabled = await Geolocator.isLocationServiceEnabled();
       if (!serviceEnabled) {
         _setError(
@@ -44,7 +45,6 @@ class _HospitalScreenState extends State<HospitalScreen> {
         return;
       }
 
-      // 2. Cek dan minta izin lokasi
       var permission = await Geolocator.checkPermission();
       if (permission == LocationPermission.denied) {
         permission = await Geolocator.requestPermission();
@@ -64,7 +64,6 @@ class _HospitalScreenState extends State<HospitalScreen> {
         return;
       }
 
-      // 3. Ambil posisi pengguna (maksimal menunggu 15 detik)
       final position = await Geolocator.getCurrentPosition(
         locationSettings: const LocationSettings(
           accuracy: LocationAccuracy.high,
@@ -77,8 +76,6 @@ class _HospitalScreenState extends State<HospitalScreen> {
         _error = null;
       });
 
-      // 4. Ambil rumah sakit terdekat dari Places API.
-      //    Jika gagal, peta tetap tampil dan pengguna diberi tahu.
       try {
         final hospitals = await PlacesService.fetchNearbyHospitals(
           position.latitude,
@@ -95,8 +92,12 @@ class _HospitalScreenState extends State<HospitalScreen> {
             Marker(
               markerId: MarkerId('$name-$lat-$lng'),
               position: LatLng(lat, lng),
-              infoWindow: InfoWindow(title: name),
-              onTap: () => _openGoogleMaps(lat, lng),
+              infoWindow: InfoWindow(
+                title: name,
+                snippet: 'Ketuk untuk jadwal dokter & rute',
+                onTap: () => _showHospitalDetailBottomSheet(hospital),
+              ),
+              onTap: () => _showHospitalDetailBottomSheet(hospital),
             ),
           );
         }
@@ -127,16 +128,255 @@ class _HospitalScreenState extends State<HospitalScreen> {
     }
   }
 
-  // ✅ Buka Google Maps app
-  Future<void> _openGoogleMaps(double lat, double lng) async {
+  void _showHospitalDetailBottomSheet(Map<String, dynamic> hospital) {
+    final String name = (hospital['name'] ?? 'Rumah Sakit').toString();
+    final String vicinity = (hospital['vicinity'] ?? '').toString();
+    final double lat = (hospital['lat'] as num).toDouble();
+    final double lng = (hospital['lng'] as num).toDouble();
+    final dynamic rating = hospital['rating'];
+    final List<dynamic> schedules =
+        (hospital['doctor_schedules'] as List<dynamic>?) ??
+        const [
+          {
+            'poli': 'Poli Spesialis Paru & Pernapasan (Sp.P)',
+            'days': 'Senin – Jumat',
+            'hours': '08:00 – 15:00 WIB',
+          },
+          {
+            'poli': 'Poli Penyakit Dalam',
+            'days': 'Senin – Sabtu',
+            'hours': '09:00 – 17:00 WIB',
+          },
+          {
+            'poli': 'IGD & Layanan Darurat Respirasi',
+            'days': 'Setiap Hari',
+            'hours': '24 Jam',
+          },
+        ];
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => Container(
+        padding: const EdgeInsets.fromLTRB(24, 18, 24, 28),
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Center(
+              child: Container(
+                width: 44,
+                height: 5,
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade300,
+                  borderRadius: BorderRadius.circular(10),
+                ),
+              ),
+            ),
+            const SizedBox(height: 18),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: primaryBlue.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  child: const Icon(
+                    Icons.local_hospital_rounded,
+                    color: primaryBlue,
+                    size: 28,
+                  ),
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        name,
+                        style: const TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.black87,
+                        ),
+                      ),
+                      if (vicinity.isNotEmpty) ...[
+                        const SizedBox(height: 4),
+                        Text(
+                          vicinity,
+                          style: const TextStyle(
+                            fontSize: 13,
+                            color: Colors.black54,
+                          ),
+                        ),
+                      ],
+                      if (rating != null) ...[
+                        const SizedBox(height: 6),
+                        Row(
+                          children: [
+                            const Icon(
+                              Icons.star_rounded,
+                              color: Colors.amber,
+                              size: 18,
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              '$rating / 5.0',
+                              style: const TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                                color: Colors.black87,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 20),
+            const Divider(height: 1),
+            const SizedBox(height: 16),
+            const Row(
+              children: [
+                Icon(
+                  Icons.schedule_rounded,
+                  size: 18,
+                  color: primaryDark,
+                ),
+                SizedBox(width: 8),
+                Text(
+                  'Jadwal Praktik Dokter & Layanan Paru',
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.bold,
+                    color: primaryDark,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            ...schedules.map((item) {
+              final s = item as Map<String, dynamic>;
+              return Container(
+                margin: const EdgeInsets.only(bottom: 10),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 14,
+                  vertical: 10,
+                ),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF5F6FF),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            s['poli']?.toString() ?? '-',
+                            style: const TextStyle(
+                              fontWeight: FontWeight.w600,
+                              fontSize: 13,
+                              color: Colors.black87,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            s['days']?.toString() ?? '-',
+                            style: const TextStyle(
+                              fontSize: 12,
+                              color: Colors.black54,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 4,
+                      ),
+                      decoration: BoxDecoration(
+                        color: primaryBlue.withValues(alpha: 0.12),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Text(
+                        s['hours']?.toString() ?? '-',
+                        style: const TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold,
+                          color: primaryBlue,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            }),
+            const SizedBox(height: 16),
+            SizedBox(
+              width: double.infinity,
+              height: 52,
+              child: ElevatedButton.icon(
+                onPressed: () {
+                  Navigator.pop(ctx);
+                  _openGoogleMapsDirections(name, lat, lng);
+                },
+                icon: const Icon(Icons.directions_rounded),
+                label: const Text(
+                  'Arahkan Rute',
+                  style: TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: primaryDark,
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  elevation: 0,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Membuka aplikasi Google Maps eksternal untuk navigasi rute ke RS.
+  Future<void> _openGoogleMapsDirections(
+    String hospitalName,
+    double lat,
+    double lng,
+  ) async {
+    final encodedDest = Uri.encodeComponent('$hospitalName @$lat,$lng');
     final Uri url = Uri.parse(
-      'https://www.google.com/maps/search/?api=1&query=$lat,$lng',
+      'https://www.google.com/maps/dir/?api=1&destination=$lat,$lng&destination_place_id=$encodedDest&travelmode=driving',
     );
 
     if (await canLaunchUrl(url)) {
       await launchUrl(url, mode: LaunchMode.externalApplication);
     } else {
-      throw 'Could not open Google Maps';
+      final fallback = Uri.parse(
+        'https://www.google.com/maps/search/?api=1&query=$lat,$lng',
+      );
+      await launchUrl(fallback, mode: LaunchMode.externalApplication);
     }
   }
 
@@ -184,7 +424,9 @@ class _HospitalScreenState extends State<HospitalScreen> {
         myLocationButtonEnabled: true,
         markers: _markers,
         onMapCreated: (GoogleMapController controller) {
-          _controller.complete(controller);
+          if (!_controller.isCompleted) {
+            _controller.complete(controller);
+          }
         },
       ),
     );

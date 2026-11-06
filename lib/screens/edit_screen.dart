@@ -29,6 +29,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   late final TextEditingController _weightController;
   late final TextEditingController _heightController;
   late final TextEditingController _historySicknessController;
+  late final TextEditingController _smokeLimitLowController;
+  late final TextEditingController _smokeLimitHighController;
 
   DateTime? _dateOfBirth;
   String? _selectedGender;
@@ -54,6 +56,12 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     _historySicknessController = TextEditingController(
       text: d['history'] ?? '',
     );
+    _smokeLimitLowController = TextEditingController(
+      text: '${d['smoke_limit_low'] ?? 5}',
+    );
+    _smokeLimitHighController = TextEditingController(
+      text: '${d['smoke_limit_high'] ?? 10}',
+    );
 
     // Parse birth date jika ada
     if (d['birth'] != null && d['birth'].toString().isNotEmpty) {
@@ -63,8 +71,12 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     }
 
     // Gender
-    final g = d['gender']?.toString().toLowerCase();
-    if (g == 'male' || g == 'female') _selectedGender = g;
+    final g = d['gender']?.toString().toLowerCase().trim();
+    if (g == 'male' || g == 'laki-laki') {
+      _selectedGender = 'male';
+    } else if (g == 'female' || g == 'perempuan') {
+      _selectedGender = 'female';
+    }
 
     final r = d['role']?.toString().toLowerCase();
     if (_roleOptions.contains(r)) {
@@ -82,6 +94,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     _weightController.dispose();
     _heightController.dispose();
     _historySicknessController.dispose();
+    _smokeLimitLowController.dispose();
+    _smokeLimitHighController.dispose();
     super.dispose();
   }
 
@@ -115,8 +129,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   Future<void> _onSave() async {
     setState(() => _isLoading = true);
     try {
-      final bool isMaster =
-          widget.currentUserRole.trim().toLowerCase() == 'master';
+      final cleanRole = widget.currentUserRole.trim().toLowerCase();
+      final bool isMaster = cleanRole == 'master' || cleanRole == 'admin';
       final profileData = <String, dynamic>{};
 
       if (_nameController.text.trim().isNotEmpty) {
@@ -149,6 +163,14 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         if (_dateOfBirth != null) {
           profileData['birth'] = _toIsoDate(_dateOfBirth);
         }
+        final lowLimit = int.tryParse(_smokeLimitLowController.text.trim());
+        final highLimit = int.tryParse(_smokeLimitHighController.text.trim());
+        if (lowLimit != null) {
+          profileData['smoke_limit_low'] = lowLimit;
+        }
+        if (highLimit != null) {
+          profileData['smoke_limit_high'] = highLimit;
+        }
       }
 
       final result = await authService.editAccount(widget.uid, profileData);
@@ -180,8 +202,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final bool isMaster =
-        widget.currentUserRole.trim().toLowerCase() == 'master';
+    final cleanRole = widget.currentUserRole.trim().toLowerCase();
+    final bool isMaster = cleanRole == 'master' || cleanRole == 'admin';
     return Scaffold(
       backgroundColor: Colors.white,
       body: SafeArea(
@@ -319,6 +341,40 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                       _buildTextField(
                         controller: _historySicknessController,
                         hint: 'Enter history of sickness',
+                      ),
+                      const SizedBox(height: 16),
+
+                      // Batas Rendah & Batas Tinggi Smoke Count
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                _buildLabel('Batas Rendah Rokok'),
+                                _buildTextField(
+                                  controller: _smokeLimitLowController,
+                                  hint: 'e.g. 5',
+                                  keyboardType: TextInputType.number,
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(width: 16),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                _buildLabel('Batas Tinggi Rokok'),
+                                _buildTextField(
+                                  controller: _smokeLimitHighController,
+                                  hint: 'e.g. 10',
+                                  keyboardType: TextInputType.number,
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
                       ),
                       const SizedBox(height: 16),
                     ],

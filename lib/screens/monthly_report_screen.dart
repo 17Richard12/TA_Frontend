@@ -107,9 +107,9 @@ class _MonthlyReportScreenState extends State<MonthlyReportScreen> {
       child: Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: color.withOpacity(0.1),
+          color: color.withValues(alpha: 0.1),
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: color.withOpacity(0.3)),
+          border: Border.all(color: color.withValues(alpha: 0.3)),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -164,6 +164,10 @@ class _MonthlyReportScreenState extends State<MonthlyReportScreen> {
     final totalSmoke = _reportData?['total_smoke_count'] ?? 0;
     final totalActivities = _reportData?['total_activities'] ?? 0;
     final totalChats = _reportData?['total_chats'] ?? 0;
+    final int smokeLimitLow =
+        (_reportData?['smoke_limit_low'] as num?)?.toInt() ?? 5;
+    final int smokeLimitHigh =
+        (_reportData?['smoke_limit_high'] as num?)?.toInt() ?? 10;
 
     return Scaffold(
       backgroundColor: Colors.white,
@@ -223,6 +227,24 @@ class _MonthlyReportScreenState extends State<MonthlyReportScreen> {
                         ),
                       ],
                     ),
+                    const SizedBox(height: 16),
+                    Row(
+                      children: [
+                        _buildSummaryCard(
+                          'Batas Rendah / Hari',
+                          '$smokeLimitLow btg',
+                          Icons.warning_amber_rounded,
+                          Colors.orange.shade800,
+                        ),
+                        const SizedBox(width: 16),
+                        _buildSummaryCard(
+                          'Batas Tinggi / Hari',
+                          '$smokeLimitHigh btg',
+                          Icons.report_problem_outlined,
+                          Colors.redAccent,
+                        ),
+                      ],
+                    ),
                     const SizedBox(height: 32),
 
                     const Text(
@@ -242,7 +264,7 @@ class _MonthlyReportScreenState extends State<MonthlyReportScreen> {
                         border: Border.all(color: Colors.grey.shade200),
                         boxShadow: [
                           BoxShadow(
-                            color: Colors.black.withOpacity(0.03),
+                            color: Colors.black.withValues(alpha: 0.03),
                             blurRadius: 10,
                             offset: const Offset(0, 4),
                           ),

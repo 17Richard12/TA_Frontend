@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:lungs_assistant_agent/services/auth_service.dart';
 import 'package:lungs_assistant_agent/screens/edit_screen.dart';
+import 'package:lungs_assistant_agent/state/smoke_sync.dart';
 
 class PatientReportScreen extends StatefulWidget {
   final String patientUid;
@@ -34,6 +35,18 @@ class _PatientReportScreenState extends State<PatientReportScreen> {
   void initState() {
     super.initState();
     _selectedDate = widget.initialDate ?? DateTime.now();
+    SmokeSync.instance.addListener(_onSmokeChanged);
+    _fetchReport();
+  }
+
+  @override
+  void dispose() {
+    SmokeSync.instance.removeListener(_onSmokeChanged);
+    super.dispose();
+  }
+
+  void _onSmokeChanged() {
+    if (!mounted) return;
     _fetchReport();
   }
 
@@ -47,6 +60,7 @@ class _PatientReportScreenState extends State<PatientReportScreen> {
       _errorMessage = '';
     });
 
+    await SmokeSync.instance.waitForPendingWrites();
     final dateStr = _formatDate(_selectedDate);
     final result = await _authService.getPatientDailyReport(
       widget.patientUid,
@@ -298,6 +312,17 @@ class _PatientReportScreenState extends State<PatientReportScreen> {
     final profile = _reportData!['patient_data'] ?? {};
     final activities = _reportData!['activities_list'] as List<dynamic>? ?? [];
     final List<dynamic> hourlyGraph = _reportData!['smoke_hourly_graph'] ?? [];
+    final int totalSmoke = (_reportData!['total_smoke'] as num?)?.toInt() ?? 0;
+    final int smokeLimitLow =
+        (_reportData!['smoke_limit_low'] as num?)?.toInt() ??
+        (profile['smoke_limit_low'] as num?)?.toInt() ??
+        5;
+    final int smokeLimitHigh =
+        (_reportData!['smoke_limit_high'] as num?)?.toInt() ??
+        (profile['smoke_limit_high'] as num?)?.toInt() ??
+        10;
+    final bool isHighSmoke = totalSmoke >= smokeLimitHigh;
+    final bool isWarnSmoke = !isHighSmoke && totalSmoke >= smokeLimitLow;
 
     return SingleChildScrollView(
       padding: const EdgeInsets.fromLTRB(
@@ -342,6 +367,14 @@ class _PatientReportScreenState extends State<PatientReportScreen> {
                   '${profile['height'] ?? '-'} cm / ${profile['weight'] ?? '-'} kg',
                 ),
                 _buildInfoRow('Riwayat Sakit', profile['history'] ?? '-'),
+                _buildInfoRow(
+                  'Batas Rendah Rokok',
+                  '$smokeLimitLow Batang / Hari',
+                ),
+                _buildInfoRow(
+                  'Batas Tinggi Rokok',
+                  '$smokeLimitHigh Batang / Hari',
+                ),
               ],
             ),
           ),
@@ -357,7 +390,7 @@ class _PatientReportScreenState extends State<PatientReportScreen> {
               Expanded(
                 child: _buildSummaryCard(
                   'Rokok',
-                  '${_reportData!['total_smoke']} Batang',
+                  '$totalSmoke Batang',
                   Icons.smoking_rooms,
                   Colors.redAccent,
                 ),
@@ -372,6 +405,60 @@ class _PatientReportScreenState extends State<PatientReportScreen> {
                 ),
               ),
             ],
+          ),
+          const SizedBox(height: 10),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 14),
+            decoration: BoxDecoration(
+              color: isHighSmoke
+                  ? Colors.red.shade50
+                  : (isWarnSmoke
+                        ? Colors.orange.shade50
+                        : Colors.green.shade50),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: isHighSmoke
+                    ? Colors.red.shade200
+                    : (isWarnSmoke
+                          ? Colors.orange.shade200
+                          : Colors.green.shade200),
+              ),
+            ),
+            child: Row(
+              children: [
+                Icon(
+                  isHighSmoke || isWarnSmoke
+                      ? Icons.warning_amber_rounded
+                      : Icons.check_circle_outline,
+                  color: isHighSmoke
+                      ? Colors.redAccent
+                      : (isWarnSmoke
+                            ? Colors.orange.shade800
+                            : Colors.green.shade700),
+                  size: 20,
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    isHighSmoke
+                        ? 'Pasien melebihi batas tinggi rokok ($totalSmoke / $smokeLimitHigh batang)'
+                        : (isWarnSmoke
+                              ? 'Pasien mencapai batas rendah rokok ($totalSmoke / $smokeLimitLow batang)'
+                              : 'Konsumsi rokok di bawah batas rendah ($totalSmoke / $smokeLimitLow batang)'),
+                    style: TextStyle(
+                      fontSize: 12.5,
+                      fontWeight: FontWeight.w600,
+                      color: isHighSmoke
+                          ? Colors.red.shade900
+                          : (isWarnSmoke
+                                ? Colors.orange.shade900
+                                : Colors.green.shade900),
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ),
           const SizedBox(height: 20),
 
@@ -545,7 +632,7 @@ class _PatientReportScreenState extends State<PatientReportScreen> {
         border: Border.all(color: Colors.grey[200]!),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.04),
+            color: Colors.black.withValues(alpha: 0.04),
             blurRadius: 8,
             offset: const Offset(0, 4),
           ),
@@ -658,7 +745,7 @@ class _PatientReportScreenState extends State<PatientReportScreen> {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
+        color: color.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(12),
       ),
       child: Column(

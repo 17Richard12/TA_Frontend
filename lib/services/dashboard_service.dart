@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:lungs_assistant_agent/constants.dart';
 import 'package:dio/dio.dart';
 
@@ -26,7 +27,7 @@ class DashboardService {
       }
       return null;
     } catch (e) {
-      print('Error fetching dashboard: $e');
+      debugPrint('Error fetching dashboard: $e');
       return null;
     }
   }
@@ -49,9 +50,12 @@ class DashboardService {
       }
       return {'status': 'error', 'message': 'Gagal mengambil laporan bulanan'};
     } on DioException catch (e) {
+      final respData = e.response?.data;
       return {
         'status': 'error',
-        'message': e.response?.data?['message']?.toString() ?? e.message,
+        'message':
+            (respData is Map ? respData['message']?.toString() : null) ??
+            e.message,
       };
     } catch (e) {
       return {'status': 'error', 'message': e.toString()};

@@ -55,7 +55,7 @@ class _AccountScreenState extends State<AccountScreen> {
   @override
   Widget build(BuildContext context) {
     final String cleanRole = widget.role.trim().toLowerCase();
-    final bool isMaster = cleanRole == 'master';
+    final bool isMaster = cleanRole == 'master' || cleanRole == 'admin';
     final bool isDokter = cleanRole == 'dokter' || cleanRole == 'doctor';
     final bool canViewPatients = isMaster || isDokter;
 
@@ -150,6 +150,7 @@ class _AccountScreenState extends State<AccountScreen> {
                   if (!mounted) return;
 
                   if (result['status'] == 'success') {
+                    if (!context.mounted) return;
                     final updatedData =
                         await Navigator.push<Map<String, dynamic>>(
                       context,

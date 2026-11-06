@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:lungs_assistant_agent/constants.dart';
 
@@ -20,7 +21,7 @@ class SmokeService {
       }
       return 0;
     } catch (e) {
-      throw Exception('Error: $e');
+      debugPrint('Error getSmokeCount: $e');
       return 0;
     }
   }
@@ -47,7 +48,7 @@ class SmokeService {
       }
       return false;
     } catch (e) {
-      throw Exception('Error: $e');
+      debugPrint('Error postSmokeCount: $e');
       return false;
     }
   }
@@ -71,7 +72,7 @@ class SmokeService {
       }
       return [];
     } catch (e) {
-      print('Error fetching report: $e');
+      debugPrint('Error fetching report: $e');
       return [];
     }
   }

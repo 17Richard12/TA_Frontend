@@ -1,5 +1,4 @@
 import 'package:lungs_assistant_agent/screens/login_screen.dart';
-import 'package:lungs_assistant_agent/screens/main_screen.dart';
 import 'package:lungs_assistant_agent/screens/terms_and_about_screen.dart';
 import 'package:lungs_assistant_agent/services/auth_service.dart';
 import 'package:lungs_assistant_agent/services/session_service.dart';
@@ -56,7 +55,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         width: 40,
                         height: 40,
                         decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.15),
+                          color: Colors.white.withValues(alpha: 0.15),
                           shape: BoxShape.circle,
                         ),
                         child: const Icon(
@@ -200,6 +199,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
                             if (value == null || value.isEmpty) {
                               return 'Password tidak boleh kosong';
                             }
+                            if (value != passwordController.text) {
+                              return 'Konfirmasi password tidak cocok';
+                            }
                             if (value.length < 8) {
                               return 'Password minimal 8 karakter';
                             }
@@ -236,7 +238,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                                             );
                                         if (mounted) {
                                           if (result['status'] == 'success') {
-                                            // 1. Simpan sesi login (Dengan penanganan NULL)
+                                            // 1. Simpan sesi login (profil belum lengkap setelah register)
                                             await SessionService.saveSession(
                                               result['uid']?.toString() ?? '',
                                               result['data']['name']
@@ -245,15 +247,17 @@ class _RegisterScreenState extends State<RegisterScreen> {
                                               result['data']['role']
                                                       ?.toString() ??
                                                   'user', // Beri nilai default 'user' jika null
+                                              profileCompleted: false,
                                             );
 
-                                            // 2. Navigasi ke MainScreen (Hapus semua route sebelumnya)
-                                            Navigator.pushReplacement(
+                                            if (!context.mounted) return;
+
+                                            // 2. Navigasi ke TermsAndAboutScreen (Hapus semua route sebelumnya)
+                                            Navigator.pushAndRemoveUntil(
                                               context,
                                               MaterialPageRoute(
                                                 builder: (context) =>
                                                     TermsAndAboutScreen(
-                                                      // <--- Ganti di sini
                                                       uid:
                                                           result['uid']
                                                               ?.toString() ??
@@ -268,8 +272,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
                                                           'user',
                                                     ),
                                               ),
+                                              (route) => false,
                                             );
                                           } else {
+                                            if (!context.mounted) return;
                                             ScaffoldMessenger.of(
                                               context,
                                             ).showSnackBar(
@@ -296,7 +302,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                               foregroundColor: Colors.white,
                               disabledBackgroundColor: const Color(
                                 0xFF2E3192,
-                              ).withOpacity(0.6),
+                              ).withValues(alpha: 0.6),
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(30),
                               ),

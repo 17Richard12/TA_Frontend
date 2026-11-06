@@ -1,4 +1,5 @@
 import 'package:lungs_assistant_agent/screens/main_screen.dart';
+import 'package:lungs_assistant_agent/screens/onboarding_screen.dart';
 import 'package:lungs_assistant_agent/screens/register_screen.dart';
 import 'package:lungs_assistant_agent/services/auth_service.dart';
 import 'package:lungs_assistant_agent/services/session_service.dart';
@@ -49,7 +50,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         width: 40,
                         height: 40,
                         decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.15),
+                          color: Colors.white.withValues(alpha: 0.15),
                           shape: BoxShape.circle,
                         ),
                         child: const Icon(
@@ -201,40 +202,59 @@ class _LoginScreenState extends State<LoginScreen> {
                                         );
                                         if (mounted) {
                                           if (result['status'] == 'success') {
-                                            // 1. Simpan sesi login (Dengan penanganan NULL)
+                                            final uid =
+                                                result['uid']?.toString() ?? '';
+                                            final userData =
+                                                result['data']
+                                                    as Map<String, dynamic>?;
+                                            final name =
+                                                userData?['name']?.toString() ??
+                                                'User';
+                                            final role =
+                                                userData?['role']?.toString() ??
+                                                'user';
+                                            final isProfileComplete =
+                                                SessionService.isProfileDataComplete(
+                                                  userData,
+                                                  roleFallback: role,
+                                                );
+
+                                            // 1. Simpan sesi login beserta status kelengkapan profil
                                             await SessionService.saveSession(
-                                              result['uid']?.toString() ?? '',
-                                              result['data']['name']
-                                                      ?.toString() ??
-                                                  'User',
-                                              result['data']['role']
-                                                      ?.toString() ??
-                                                  'user', // Beri nilai default 'user' jika null
+                                              uid,
+                                              name,
+                                              role,
+                                              profileCompleted:
+                                                  isProfileComplete,
                                             );
 
-                                            // 2. Navigasi ke MainScreen (Hapus semua route sebelumnya)
+                                            if (!context.mounted) return;
+
+                                            // 2. Mandatory Profile Guard:
+                                            // Jika profil belum lengkap, redirect paksa ke halaman Lengkapi Profil (OnboardingScreen)
+                                            final Widget targetScreen =
+                                                isProfileComplete
+                                                ? MainScreen(
+                                                    uid: uid,
+                                                    name: name,
+                                                    role: role,
+                                                  )
+                                                : OnboardingScreen(
+                                                    uid: uid,
+                                                    name: name,
+                                                    role: role,
+                                                  );
+
                                             Navigator.pushAndRemoveUntil(
                                               context,
                                               MaterialPageRoute(
                                                 builder: (context) =>
-                                                    MainScreen(
-                                                      uid:
-                                                          result['uid']
-                                                              ?.toString() ??
-                                                          '',
-                                                      name:
-                                                          result['data']['name']
-                                                              ?.toString() ??
-                                                          'User',
-                                                      role:
-                                                          result['data']['role']
-                                                              ?.toString() ??
-                                                          'user',
-                                                    ),
+                                                    targetScreen,
                                               ),
                                               (route) => false,
                                             );
                                           } else {
+                                            if (!context.mounted) return;
                                             ScaffoldMessenger.of(
                                               context,
                                             ).showSnackBar(
@@ -261,7 +281,7 @@ class _LoginScreenState extends State<LoginScreen> {
                               foregroundColor: Colors.white,
                               disabledBackgroundColor: const Color(
                                 0xFF2E3192,
-                              ).withOpacity(0.6),
+                              ).withValues(alpha: 0.6),
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(30),
                               ),
