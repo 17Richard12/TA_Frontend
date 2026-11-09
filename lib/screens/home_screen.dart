@@ -106,10 +106,21 @@ class _HomeScreenState extends State<HomeScreen> {
 
     if (!mounted) return;
     if (res['status'] == 'success' && res['data'] is Map<String, dynamic>) {
+      final responseData = res['data'] as Map<String, dynamic>;
       setState(() {
-        _yesterdaySummaryData = res['data'] as Map<String, dynamic>;
+        _yesterdaySummaryData = responseData;
         _yesterdaySummaryLoading = false;
       });
+      if (forceRefresh && responseData['rate_limited'] == true && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Analisa sudah mutakhir dengan data kemarin saat ini. Coba lagi beberapa saat jika ingin memuat ulang.',
+            ),
+            duration: Duration(seconds: 2),
+          ),
+        );
+      }
     } else {
       setState(() {
         _yesterdaySummaryError =
@@ -871,24 +882,51 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget _buildYesterdayAiSummaryCard() {
     final data = _yesterdaySummaryData ?? {};
     final yesterdayDate = (data['yesterday_date'] ?? 'Kemarin').toString();
-    final smokeYesterday =
+    final bool smokeRecorded = data.containsKey('smoke_recorded')
+        ? data['smoke_recorded'] == true
+        : data['smoke_count_total'] != null;
+    final int smokeYesterday =
         int.tryParse((data['smoke_count_total'] ?? 0).toString()) ?? 0;
-    final limitLow =
+    final int limitLow =
         int.tryParse((data['smoke_limit_low'] ?? _smokeLimitLow).toString()) ??
         _smokeLimitLow;
-    final activitiesDone =
+    final int activitiesDone =
         int.tryParse((data['daily_activities_done_total'] ?? 0).toString()) ??
         0;
-    final activitiesTotal =
+    final int activitiesTotal =
         int.tryParse((data['daily_activities_total'] ?? 0).toString()) ?? 0;
-    final chatTotal = int.tryParse((data['chat_total'] ?? 0).toString()) ?? 0;
+    final int chatMessages =
+        int.tryParse(
+          (data['chat_messages_total'] ?? data['chat_total'] ?? 0).toString(),
+        ) ??
+        0;
+    final int chatSessions =
+        int.tryParse((data['chat_sessions_total'] ?? 0).toString()) ??
+        (chatMessages > 0 ? 1 : 0);
+
+    final String analysisSource =
+        (data['analysis_source'] ?? data['source'] ?? 'fallback')
+            .toString()
+            .toLowerCase();
+    final bool isAiGenerated =
+        data['ai_generated'] == true || analysisSource == 'gemini';
+    final String sourceBadgeLabel = isAiGenerated
+        ? 'AI Gemini'
+        : 'Ringkasan Otomatis';
 
     final summaryText = (data['summary'] ?? '').toString().trim();
     final feedbackText = (data['feedback'] ?? '').toString().trim();
 
-    final Color smokeChipColor = smokeYesterday == 0
-        ? accentGreen
-        : (smokeYesterday <= limitLow ? Colors.orange : Colors.redAccent);
+    final Color smokeChipColor = !smokeRecorded
+        ? Colors.blueGrey
+        : (smokeYesterday == 0
+              ? accentGreen
+              : (smokeYesterday <= limitLow
+                    ? Colors.orange
+                    : Colors.redAccent));
+    final String smokeChipLabel = !smokeRecorded
+        ? 'Rokok belum dicatat'
+        : '$smokeYesterday btg kemarin';
 
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 20),
@@ -935,7 +973,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       ),
                     ),
                     Text(
-                      'Data H-1 ($yesterdayDate)',
+                      'Data H-1 ($yesterdayDate) • $sourceBadgeLabel',
                       style: const TextStyle(fontSize: 11, color: textSub),
                     ),
                   ],
@@ -1005,7 +1043,7 @@ class _HomeScreenState extends State<HomeScreen> {
               children: [
                 _buildYesterdayMetricChip(
                   icon: Icons.smoking_rooms_rounded,
-                  label: '$smokeYesterday btg kemarin',
+                  label: smokeChipLabel,
                   color: smokeChipColor,
                 ),
                 _buildYesterdayMetricChip(
@@ -1015,10 +1053,10 @@ class _HomeScreenState extends State<HomeScreen> {
                       : '$activitiesDone aktivitas selesai',
                   color: accentBlue,
                 ),
-                if (chatTotal > 0)
+                if (chatMessages > 0)
                   _buildYesterdayMetricChip(
                     icon: Icons.chat_bubble_outline_rounded,
-                    label: '$chatTotal konsultasi',
+                    label: '$chatSessions sesi ($chatMessages pesan)',
                     color: primaryDark,
                   ),
               ],
