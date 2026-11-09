@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:async';
 import 'package:lungs_assistant_agent/constants.dart';
 import 'package:lungs_assistant_agent/services/chat_service.dart';
+import 'package:lungs_assistant_agent/services/session_service.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:http/http.dart' as http;
@@ -34,6 +35,8 @@ class _ChatScreenState extends State<ChatScreen> {
   final List<Map<String, dynamic>> _messages = [];
   bool _isLoading = false;
   String? _activeSessionId;
+  http.Client? _activeClient;
+  StreamSubscription<String>? _streamSubscription;
 
   @override
   void initState() {
@@ -63,9 +66,64 @@ class _ChatScreenState extends State<ChatScreen> {
     }
   }
 
+  void _cancelActiveStream() {
+    _streamSubscription?.cancel();
+    _streamSubscription = null;
+    _activeClient?.close();
+    _activeClient = null;
+  }
+
+  bool _processSseEvent(String rawEvent, int aiIndex) {
+    final event = rawEvent.trim();
+    if (event.isEmpty) return false;
+
+    final lines = event.split('\n');
+    final dataLines = lines
+        .where((l) => l.startsWith('data:'))
+        .map((l) => l.startsWith('data: ') ? l.substring(6) : l.substring(5))
+        .join('\n');
+
+    if (dataLines.isEmpty) return false;
+
+    if (dataLines.startsWith('[SESSION]')) {
+      _activeSessionId ??= dataLines.substring(9).trim();
+      return false;
+    } else if (dataLines == '[DONE]') {
+      return true;
+    } else if (dataLines.startsWith('[ERROR]')) {
+      if (mounted && aiIndex < _messages.length) {
+        setState(
+          () => _messages[aiIndex] = {
+            'text':
+                'Maaf, terjadi gangguan saat memproses pesan: ${dataLines.substring(7)}',
+            'isUser': false,
+          },
+        );
+      }
+      return true;
+    } else {
+      String decoded = dataLines;
+      try {
+        decoded = jsonDecode(dataLines) as String;
+      } catch (_) {
+        decoded = dataLines;
+      }
+      if (mounted && aiIndex < _messages.length) {
+        setState(() {
+          final current = _messages[aiIndex]['text'] as String;
+          _messages[aiIndex] = {'text': current + decoded, 'isUser': false};
+        });
+        _scrollToBottom();
+      }
+      return false;
+    }
+  }
+
   Future<void> _sendMessage() async {
     final text = _controller.text.trim();
     if (text.isEmpty || _isLoading) return;
+
+    _cancelActiveStream();
 
     // Tambah pesan user
     setState(() {
@@ -79,93 +137,99 @@ class _ChatScreenState extends State<ChatScreen> {
 
     // Index bubble AI yang sedang di-stream
     final aiIndex = _messages.length - 1;
+    final client = http.Client();
+    _activeClient = client;
 
     try {
       final request = http.Request(
         'POST',
         Uri.parse('${AppConstants.baseUrl}/api/chats/stream'),
       );
-      request.headers['Content-Type'] = 'application/json';
+      final headers = await SessionService.getAuthHeaders();
+      request.headers.addAll(headers);
       request.body = jsonEncode({
         'user_uid': widget.userUid,
         'session_id': _activeSessionId,
         'message': text,
       });
 
-      final streamedResponse = await request.send();
+      final streamedResponse = await client
+          .send(request)
+          .timeout(const Duration(seconds: 95));
+
+      if (streamedResponse.statusCode != 200) {
+        final errorBody = await streamedResponse.stream.bytesToString();
+        String errMsg =
+            'Gagal terhubung ke layanan konsultasi (${streamedResponse.statusCode}).';
+        try {
+          final parsed = jsonDecode(errorBody);
+          if (parsed is Map && parsed['detail'] != null) {
+            errMsg = parsed['detail'].toString();
+          }
+        } catch (_) {}
+        if (mounted && aiIndex < _messages.length) {
+          setState(
+            () => _messages[aiIndex] = {'text': errMsg, 'isUser': false},
+          );
+        }
+        return;
+      }
 
       // Buffer untuk menampung data SSE yang belum lengkap
       final StringBuffer buffer = StringBuffer();
+      final completer = Completer<void>();
 
-      await for (final chunk in streamedResponse.stream.transform(
-        utf8.decoder,
-      )) {
-        buffer.write(chunk);
-        final raw = buffer.toString();
+      _streamSubscription = streamedResponse.stream
+          .transform(utf8.decoder)
+          .listen(
+            (chunk) {
+              buffer.write(chunk.replaceAll('\r\n', '\n'));
+              final raw = buffer.toString();
 
-        // Proses semua event SSE yang sudah lengkap (diakhiri \n\n)
-        final events = raw.split('\n\n');
+              // Proses semua event SSE yang sudah lengkap (diakhiri \n\n)
+              final events = raw.split('\n\n');
 
-        // Event terakhir mungkin belum lengkap, simpan kembali ke buffer
-        buffer.clear();
-        buffer.write(events.last);
+              // Event terakhir mungkin belum lengkap, simpan kembali ke buffer
+              buffer.clear();
+              buffer.write(events.last);
 
-        // Proses semua event kecuali yang terakhir (belum tentu lengkap)
-        for (int i = 0; i < events.length - 1; i++) {
-          final event = events[i].trim();
-          if (event.isEmpty) continue;
+              for (int i = 0; i < events.length - 1; i++) {
+                final shouldStop = _processSseEvent(events[i], aiIndex);
+                if (shouldStop) {
+                  if (!completer.isCompleted) completer.complete();
+                  return;
+                }
+              }
+            },
+            onError: (Object error) {
+              if (!completer.isCompleted) completer.completeError(error);
+            },
+            onDone: () {
+              final remaining = buffer.toString().trim();
+              if (remaining.isNotEmpty) {
+                _processSseEvent(remaining, aiIndex);
+              }
+              if (!completer.isCompleted) completer.complete();
+            },
+            cancelOnError: true,
+          );
 
-          // Gabungkan semua baris dalam satu event yang diawali "data: "
-          final lines = event.split('\n');
-          final dataLines = lines
-              .where((l) => l.startsWith('data: '))
-              .map((l) => l.substring(6))
-              .join('\n');
-
-          if (dataLines.isEmpty) continue;
-
-          if (dataLines.startsWith('[SESSION]')) {
-            _activeSessionId ??= dataLines.substring(9);
-          } else if (dataLines == '[DONE]') {
-            break;
-          } else if (dataLines.startsWith('[ERROR]')) {
-            if (mounted) {
-              setState(
-                () => _messages[aiIndex] = {
-                  'text': 'Error: ${dataLines.substring(7)}',
-                  'isUser': false,
-                },
-              );
-            }
-            break;
-          } else {
-            // Decode JSON string agar \n, bold, dll tampil benar
-            String decoded = dataLines;
-            try {
-              decoded = jsonDecode(dataLines) as String;
-            } catch (_) {
-              decoded = dataLines;
-            }
-            if (mounted) {
-              setState(() {
-                final current = _messages[aiIndex]['text'] as String;
-                _messages[aiIndex] = {
-                  'text': current + decoded,
-                  'isUser': false,
-                };
-              });
-              _scrollToBottom();
-            }
-          }
+      await completer.future;
+    } catch (e) {
+      if (mounted && aiIndex < _messages.length) {
+        final current = (_messages[aiIndex]['text'] as String?) ?? '';
+        if (current.isEmpty) {
+          setState(
+            () => _messages[aiIndex] = {
+              'text':
+                  'Maaf, koneksi terputus saat menerima respons. Silakan coba lagi.',
+              'isUser': false,
+            },
+          );
         }
       }
-    } catch (e) {
-      if (mounted) {
-        setState(
-          () => _messages[aiIndex] = {'text': 'Error: $e', 'isUser': false},
-        );
-      }
     } finally {
+      _cancelActiveStream();
       if (mounted) setState(() => _isLoading = false);
     }
   }
@@ -183,8 +247,9 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   void _startNewSession() {
-    if (_isLoading) return;
+    _cancelActiveStream();
     setState(() {
+      _isLoading = false;
       _messages.clear();
       _activeSessionId = null;
     });
@@ -193,6 +258,7 @@ class _ChatScreenState extends State<ChatScreen> {
 
   @override
   void dispose() {
+    _cancelActiveStream();
     _controller.dispose();
     _scrollController.dispose();
     super.dispose();
@@ -213,7 +279,9 @@ class _ChatScreenState extends State<ChatScreen> {
                   const SizedBox(width: 12),
                   Expanded(
                     child: Text(
-                      _activeSessionId == null ? 'New Chat' : widget.sessionName,
+                      _activeSessionId == null
+                          ? 'New Chat'
+                          : widget.sessionName,
                       style: const TextStyle(
                         fontSize: 22,
                         fontWeight: FontWeight.bold,
@@ -224,7 +292,10 @@ class _ChatScreenState extends State<ChatScreen> {
                   ),
                   IconButton(
                     onPressed: _startNewSession,
-                    icon: const Icon(Icons.add_circle_outline, color: Colors.black87),
+                    icon: const Icon(
+                      Icons.add_circle_outline,
+                      color: Colors.black87,
+                    ),
                     tooltip: 'Sesi Baru',
                   ),
                 ],

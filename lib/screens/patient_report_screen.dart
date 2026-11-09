@@ -341,12 +341,18 @@ class _PatientReportScreenState extends State<PatientReportScreen> {
                 'Profil Medis',
                 style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
               ),
-              IconButton(
-                onPressed: _navigateToEditProfile,
-                icon: const Icon(Icons.edit_note, color: primaryBlue, size: 26),
-                padding: EdgeInsets.zero,
-                constraints: const BoxConstraints(),
-              ),
+              if (widget.currentUserRole.toLowerCase() == 'master' ||
+                  widget.currentUserRole.toLowerCase() == 'admin')
+                IconButton(
+                  onPressed: _navigateToEditProfile,
+                  icon: const Icon(
+                    Icons.edit_note,
+                    color: primaryBlue,
+                    size: 26,
+                  ),
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(),
+                ),
             ],
           ),
           const SizedBox(height: 8),

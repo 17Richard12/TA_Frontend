@@ -276,7 +276,10 @@ class _XrayScreenState extends State<XrayScreen> {
 
       setState(() => _isUploading = true);
 
-      final base64Image = 'data:image/jpeg;base64,${base64Encode(bytes)}';
+      final mimeType = ext == 'png'
+          ? 'image/png'
+          : (ext == 'webp' ? 'image/webp' : 'image/jpeg');
+      final base64Image = 'data:$mimeType;base64,${base64Encode(bytes)}';
 
       final result = await XrayService.uploadXrayPhoto(
         widget.userUid,

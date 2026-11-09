@@ -1,21 +1,38 @@
 import 'package:lungs_assistant_agent/constants.dart';
+import 'package:lungs_assistant_agent/services/session_service.dart';
 import 'package:dio/dio.dart';
 
 class AuthService {
-  static final Dio _dio = Dio(
-    BaseOptions(
-      baseUrl: AppConstants.baseUrl,
-      connectTimeout: const Duration(seconds: 15),
-      receiveTimeout: const Duration(seconds: 30),
-      headers: {'Content-Type': 'application/json'},
-    ),
-  );
+  static final Dio _dio = _createDio();
+
+  static Dio _createDio() {
+    final dio = Dio(
+      BaseOptions(
+        baseUrl: AppConstants.baseUrl,
+        connectTimeout: const Duration(seconds: 15),
+        receiveTimeout: const Duration(seconds: 30),
+        headers: {'Content-Type': 'application/json'},
+      ),
+    );
+    dio.interceptors.add(
+      InterceptorsWrapper(
+        onRequest: (options, handler) async {
+          final token = await SessionService.getToken();
+          if (token != null && token.isNotEmpty) {
+            options.headers['Authorization'] = 'Bearer $token';
+          }
+          handler.next(options);
+        },
+      ),
+    );
+    return dio;
+  }
 
   // ========================
   // REGISTER
   // POST /api/users/register
   // Body: { name, email, password }
-  // Response: { status, message, data: { uid, name, email, ... } }
+  // Response: { status, message, data: { uid, name, email, access_token, ... } }
   // ========================
   Future<Map<String, dynamic>> register(
     String name,
@@ -30,11 +47,12 @@ class AuthService {
 
       final data = response.data;
       if (data['status'] == 'success') {
-        return {
-          'status': 'success',
-          'uid': data['data']['uid'],
-          'data': data['data'],
-        };
+        final userData = data['data'] as Map<String, dynamic>? ?? {};
+        final token = userData['access_token']?.toString();
+        if (token != null && token.isNotEmpty) {
+          await SessionService.setToken(token);
+        }
+        return {'status': 'success', 'uid': userData['uid'], 'data': userData};
       } else {
         return {'status': 'error', 'message': data['message']};
       }
@@ -49,7 +67,7 @@ class AuthService {
   // LOGIN
   // POST /api/users/login
   // Body: { email, password }
-  // Response: { status, message, data: { uid, name, email, ... } }
+  // Response: { status, message, data: { uid, name, email, access_token, ... } }
   // ========================
   Future<Map<String, dynamic>> login(String email, String password) async {
     try {
@@ -60,11 +78,12 @@ class AuthService {
 
       final data = response.data;
       if (data['status'] == 'success') {
-        return {
-          'status': 'success',
-          'uid': data['data']['uid'],
-          'data': data['data'],
-        };
+        final userData = data['data'] as Map<String, dynamic>? ?? {};
+        final token = userData['access_token']?.toString();
+        if (token != null && token.isNotEmpty) {
+          await SessionService.setToken(token);
+        }
+        return {'status': 'success', 'uid': userData['uid'], 'data': userData};
       } else {
         return {'status': 'error', 'message': data['message']};
       }
@@ -91,7 +110,12 @@ class AuthService {
         return {'status': 'error', 'message': data['message']};
       }
     } on DioException catch (e) {
-      return {'status': 'error', 'message': _handleDioError(e)};
+      final isUnauthorized = e.response?.statusCode == 401;
+      return {
+        'status': 'error',
+        'unauthorized': isUnauthorized,
+        'message': _handleDioError(e),
+      };
     } catch (e) {
       return {'status': 'error', 'message': 'Unexpected error: $e'};
     }
@@ -133,17 +157,21 @@ class AuthService {
   // ========================
   // CHANGE PASSWORD
   // PUT /api/users/{uid}/change-password
-  // Body: { new_password }
+  // Body: { current_password, new_password }
   // Response: { status, message }
   // ========================
   Future<Map<String, dynamic>> changePassword(
     String uid,
+    String currentPassword,
     String newPassword,
   ) async {
     try {
       final response = await _dio.put(
         '/api/users/$uid/change-password',
-        data: {'new_password': newPassword},
+        data: {
+          'current_password': currentPassword,
+          'new_password': newPassword,
+        },
       );
 
       final data = response.data;
@@ -175,24 +203,31 @@ class AuthService {
       case DioExceptionType.badResponse:
         final statusCode = e.response?.statusCode;
 
-        // Ambil pesan dari backend jika ada
         final respData = e.response?.data;
-        final backendMessage = respData is Map
-            ? (respData['detail'] ?? respData['message'])?.toString()
-            : null;
+        String? backendMessage;
+        if (respData is Map) {
+          final detail = respData['detail'];
+          if (detail is List && detail.isNotEmpty) {
+            final first = detail.first;
+            backendMessage = first is Map
+                ? first['msg']?.toString()
+                : first.toString();
+          } else {
+            backendMessage = (detail ?? respData['message'])?.toString();
+          }
+        }
 
-        // Filter pesan berdasarkan kode status HTTP
-        if (statusCode == 400) {
-          // Biasanya karena input salah (misal email sudah terdaftar)
+        if (statusCode == 400 || statusCode == 422) {
           return backendMessage ??
               'Data yang kamu masukkan kurang tepat. Coba periksa lagi ya.';
         } else if (statusCode == 401) {
-          // Biasanya karena password salah / sesi habis
-          return 'Email atau kata sandi tidak sesuai. Silakan periksa kembali.';
+          return backendMessage ??
+              'Email atau kata sandi tidak sesuai. Silakan periksa kembali.';
         } else if (statusCode == 403) {
-          return 'Maaf, kamu tidak memiliki akses untuk tindakan ini.';
+          return backendMessage ??
+              'Maaf, kamu tidak memiliki akses untuk tindakan ini.';
         } else if (statusCode == 404) {
-          return 'Data yang kamu cari tidak ditemukan.';
+          return backendMessage ?? 'Data yang kamu cari tidak ditemukan.';
         } else if (statusCode != null && statusCode >= 500) {
           return 'Maaf, server kami sedang sibuk atau ada gangguan. Coba beberapa saat lagi ya.';
         }

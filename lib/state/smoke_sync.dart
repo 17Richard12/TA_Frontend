@@ -5,14 +5,6 @@ import 'package:lungs_assistant_agent/services/smoke_service.dart';
 
 /// Single source of truth untuk jumlah rokok hari ini.
 ///
-/// Masalah sebelumnya:
-/// * Home melakukan optimistic update lalu mengirim POST tanpa menunggu,
-///   sehingga ketika user langsung membuka tab "Report", data diambil
-///   sebelum POST selesai dan tampil 0 / angka lama.
-/// * Tap cepat (+/+/+) mengirim beberapa POST paralel yang bisa tiba
-///   di server tidak berurutan sehingga total akhir salah.
-///
-/// Solusi:
 /// * Semua penulisan diserialisasi lewat antrean ([_tail]) dan di-*coalesce*
 ///   (hanya nilai terbaru yang dikirim).
 /// * Layar lain (Report) mendengarkan [SmokeSync] dan dapat menunggu
@@ -40,34 +32,36 @@ class SmokeSync extends ChangeNotifier {
 
   /// Dipanggil Home setelah GET dari server agar store tahu nilai awal.
   void seed(String userId, String date, int count) {
+    final safeCount = count < 0 ? 0 : count;
     if (_userId != userId || _date != date) {
       _userId = userId;
       _date = date;
-      _desired = count;
-      _lastSynced = count;
+      _desired = safeCount;
+      _lastSynced = safeCount;
       return;
     }
     if (!hasPendingWrites) {
-      _desired = count;
-      _lastSynced = count;
+      _desired = safeCount;
+      _lastSynced = safeCount;
     }
   }
 
   /// Menyimpan total rokok hari ini. Return `true` jika tersimpan.
   Future<bool> setCount(String userId, String date, int count) {
+    final safeCount = count < 0 ? 0 : (count > 200 ? 200 : count);
     if (_userId != userId || _date != date) {
       _userId = userId;
       _date = date;
-      _lastSynced = null;
+      _lastSynced = 0;
     }
-    _desired = count;
+    _desired = safeCount;
     _pendingWrites++;
 
     final completer = Completer<bool>();
     _tail = _tail.then((_) async {
       bool ok = true;
       try {
-        final target = _desired!;
+        final target = _desired ?? 0;
         if (target != _lastSynced) {
           ok = await SmokeService.postSmokeCount(userId, date, target);
           if (ok) {
@@ -81,7 +75,9 @@ class SmokeSync extends ChangeNotifier {
         ok = false;
       } finally {
         _pendingWrites--;
-        if (!ok) _desired = _lastSynced;
+        if (!ok && _pendingWrites == 0) {
+          _desired = _lastSynced ?? 0;
+        }
         completer.complete(ok);
       }
     });

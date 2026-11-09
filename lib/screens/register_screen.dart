@@ -248,6 +248,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
                                                       ?.toString() ??
                                                   'user', // Beri nilai default 'user' jika null
                                               profileCompleted: false,
+                                              token:
+                                                  result['data']['access_token']
+                                                      ?.toString(),
                                             );
 
                                             if (!context.mounted) return;

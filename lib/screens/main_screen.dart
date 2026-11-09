@@ -306,9 +306,7 @@ class _MainScreenState extends State<MainScreen> {
           });
         },
       ),
-      HospitalScreen(
-        key: ValueKey('hospital_$_hospitalRefreshKey'),
-      ),
+      HospitalScreen(key: ValueKey('hospital_$_hospitalRefreshKey')),
       HistoryScreen(
         key: ValueKey('history_$_historyRefreshKey'),
         userUid: widget.uid,

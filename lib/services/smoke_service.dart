@@ -2,15 +2,18 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:lungs_assistant_agent/constants.dart';
+import 'package:lungs_assistant_agent/services/session_service.dart';
 
 class SmokeService {
   // Mengambil data smoke count harian
   static Future<int> getSmokeCount(String userId, String timestamp) async {
     try {
+      final headers = await SessionService.getAuthHeaders(jsonContent: false);
       final response = await http.get(
         Uri.parse(
           '${AppConstants.baseUrl}/api/smoke-count/?user_id=$userId&timestamp=$timestamp',
         ),
+        headers: headers,
       );
 
       if (response.statusCode == 200) {
@@ -33,9 +36,10 @@ class SmokeService {
     int total,
   ) async {
     try {
+      final headers = await SessionService.getAuthHeaders();
       final response = await http.post(
         Uri.parse('${AppConstants.baseUrl}/api/smoke-count/'),
-        headers: {"Content-Type": "application/json"},
+        headers: headers,
         body: jsonEncode({
           "user_id": userId,
           "timestamp": timestamp,
@@ -58,10 +62,12 @@ class SmokeService {
     String timestamp,
   ) async {
     try {
+      final headers = await SessionService.getAuthHeaders(jsonContent: false);
       final response = await http.get(
         Uri.parse(
           '${AppConstants.baseUrl}/api/smoke-count/report?user_id=$userId&timestamp=$timestamp',
         ),
+        headers: headers,
       );
 
       if (response.statusCode == 200) {

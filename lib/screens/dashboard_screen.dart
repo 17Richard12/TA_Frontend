@@ -179,7 +179,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
     final int? confirmedToday = _isToday
         ? SmokeSync.instance.confirmedCountFor(widget.userUid, _formattedDate)
         : null;
-    final int smokeTotal = confirmedToday ??
+    final int smokeTotal =
+        confirmedToday ??
         ((_dashboardData!['smoke_count_total'] as num?)?.toInt() ?? 0);
     final int smokeLimitLow =
         (_dashboardData!['smoke_limit_low'] as num?)?.toInt() ?? 5;

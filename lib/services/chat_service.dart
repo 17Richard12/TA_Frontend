@@ -1,15 +1,32 @@
 import 'package:lungs_assistant_agent/constants.dart';
+import 'package:lungs_assistant_agent/services/session_service.dart';
 import 'package:dio/dio.dart';
 
 class ChatService {
-  static final Dio _dio = Dio(
-    BaseOptions(
-      baseUrl: AppConstants.baseUrl,
-      connectTimeout: const Duration(seconds: 10),
-      receiveTimeout: const Duration(seconds: 120),
-      headers: {'Content-Type': 'application/json'},
-    ),
-  );
+  static final Dio _dio = _createDio();
+
+  static Dio _createDio() {
+    final dio = Dio(
+      BaseOptions(
+        baseUrl: AppConstants.baseUrl,
+        connectTimeout: const Duration(seconds: 10),
+        receiveTimeout: const Duration(seconds: 120),
+        headers: {'Content-Type': 'application/json'},
+      ),
+    );
+    dio.interceptors.add(
+      InterceptorsWrapper(
+        onRequest: (options, handler) async {
+          final token = await SessionService.getToken();
+          if (token != null && token.isNotEmpty) {
+            options.headers['Authorization'] = 'Bearer $token';
+          }
+          handler.next(options);
+        },
+      ),
+    );
+    return dio;
+  }
 
   // ========================
   // POST CHAT
@@ -27,7 +44,7 @@ class ChatService {
         '/api/chats/',
         data: {
           'user_uid': userUid,
-          'session_id': sessionId, // null = buat session baru
+          'session_id': sessionId,
           'message': message,
         },
       );
@@ -59,7 +76,6 @@ class ChatService {
   // ========================
   // GET CHAT BY SESSION
   // GET /api/chats/session/{session_id}
-  // Response: { status, data: { session_id, user, chats } }
   // ========================
   static Future<Map<String, dynamic>> getChatBySession(String sessionId) async {
     try {
@@ -81,7 +97,6 @@ class ChatService {
   // ========================
   // GET CHAT HISTORY
   // GET /api/chats/history/{user_uid}
-  // Response: { status, data: [ { session_id, preview }, ... ] }
   // ========================
   static Future<Map<String, dynamic>> getChatHistory(String userUid) async {
     try {

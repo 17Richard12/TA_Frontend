@@ -1,20 +1,37 @@
 import 'package:lungs_assistant_agent/constants.dart';
+import 'package:lungs_assistant_agent/services/session_service.dart';
 import 'package:dio/dio.dart';
 
 class XrayService {
-  static final Dio _dio = Dio(
-    BaseOptions(
-      baseUrl: AppConstants.baseUrl,
-      connectTimeout: const Duration(seconds: 15),
-      receiveTimeout: const Duration(seconds: 90),
-      headers: {'Content-Type': 'application/json'},
-    ),
-  );
+  static final Dio _dio = _createDio();
+
+  static Dio _createDio() {
+    final dio = Dio(
+      BaseOptions(
+        baseUrl: AppConstants.baseUrl,
+        connectTimeout: const Duration(seconds: 15),
+        receiveTimeout: const Duration(seconds: 90),
+        headers: {'Content-Type': 'application/json'},
+      ),
+    );
+    dio.interceptors.add(
+      InterceptorsWrapper(
+        onRequest: (options, handler) async {
+          final token = await SessionService.getToken();
+          if (token != null && token.isNotEmpty) {
+            options.headers['Authorization'] = 'Bearer $token';
+          }
+          handler.next(options);
+        },
+      ),
+    );
+    return dio;
+  }
 
   static Future<Map<String, dynamic>> getLatestXrayPhotos(String userId) async {
     try {
       final response = await _dio.get(
-        '/api/xrays/compare', // Disesuaikan dengan endpoint X-Ray
+        '/api/xrays/compare',
         queryParameters: {'user_id': userId},
       );
 
@@ -29,7 +46,9 @@ class XrayService {
       return {
         'status': 'error',
         'message':
-            (respData is Map ? respData['message']?.toString() : null) ??
+            (respData is Map
+                ? (respData['detail'] ?? respData['message'])?.toString()
+                : null) ??
             e.message,
       };
     } catch (e) {
@@ -43,7 +62,7 @@ class XrayService {
   ) async {
     try {
       final response = await _dio.post(
-        '/api/xrays/', // Disesuaikan dengan endpoint X-Ray
+        '/api/xrays/',
         data: {'user_id': userId, 'foto_base64': base64Image},
       );
       if (response.statusCode == 200 || response.statusCode == 201) {

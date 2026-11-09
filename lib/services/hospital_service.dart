@@ -9,7 +9,6 @@ class PlacesService {
     double lat,
     double lng,
   ) async {
-    // 1. Tambahkan keyword 'rumah sakit umum' agar Google memprioritaskan RS Umum/Daerah
     final url = Uri.parse(
       'https://maps.googleapis.com/maps/api/place/nearbysearch/json'
       '?location=$lat,$lng'
@@ -27,7 +26,6 @@ class PlacesService {
 
       final List<Map<String, dynamic>> generalHospitals = [];
 
-      // 2. Filter manual untuk menyingkirkan RSIA, Klinik, dan Spesialis yang masih lolos
       for (final place in allResults) {
         final name = (place['name'] ?? '').toString().toLowerCase();
 
@@ -41,34 +39,20 @@ class PlacesService {
             name.contains('mata') ||
             name.contains('kecantikan');
 
-        // Jika BUKAN rumah sakit bersalin/klinik spesialis, masukkan ke daftar
         if (!isMaternity && !isClinic && !isSpecialist) {
           final location = place['geometry']['location'];
           final openNow = place['opening_hours']?['open_now'];
           generalHospitals.add({
             'name': place['name'],
+            'place_id': place['place_id'],
             'lat': location['lat'],
             'lng': location['lng'],
-            'vicinity': place['vicinity'] ?? '', // Alamat singkat
+            'vicinity': place['vicinity'] ?? '',
             'rating': place['rating'],
             'open_now': openNow,
-            'doctor_schedules': [
-              {
-                'poli': 'Poli Spesialis Paru & Pernapasan (Sp.P)',
-                'days': 'Senin – Jumat',
-                'hours': '08:00 – 15:00 WIB',
-              },
-              {
-                'poli': 'Poli Penyakit Dalam & Konsultasi Berhenti Merokok',
-                'days': 'Senin – Sabtu',
-                'hours': '09:00 – 17:00 WIB',
-              },
-              {
-                'poli': 'IGD & Layanan Darurat Respirasi',
-                'days': 'Setiap Hari',
-                'hours': '24 Jam',
-              },
-            ],
+            // Tidak mengisi jadwal dokter fiktif karena Google Places Nearby Search
+            // tidak menyediakan jadwal resmi praktik dokter rumah sakit.
+            'doctor_schedules': <Map<String, dynamic>>[],
           });
         }
       }

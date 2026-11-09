@@ -141,9 +141,17 @@ class NotificationService {
         iOS: DarwinNotificationDetails(),
       );
 
+      // Reset flag jika pengguna menurunkan hitungan rokok di bawah ambang batas
+      if (highLimit > 0 && smokeCount < highLimit) {
+        await prefs.remove(highKey);
+      }
+      if (lowLimit > 0 && smokeCount < lowLimit) {
+        await prefs.remove(lowKey);
+      }
+
       if (highLimit > 0 && smokeCount >= highLimit) {
         final alreadySentHigh = prefs.getBool(highKey) ?? false;
-        if (!alreadySentHigh || smokeCount > highLimit) {
+        if (!alreadySentHigh) {
           await _plugin.show(
             _warningHighId,
             '⚠️ Warning: Batas Tinggi Rokok Terlampaui!',

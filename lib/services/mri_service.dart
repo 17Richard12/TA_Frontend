@@ -1,15 +1,32 @@
 import 'package:lungs_assistant_agent/constants.dart';
+import 'package:lungs_assistant_agent/services/session_service.dart';
 import 'package:dio/dio.dart';
 
 class MriService {
-  static final Dio _dio = Dio(
-    BaseOptions(
-      baseUrl: AppConstants.baseUrl,
-      connectTimeout: const Duration(seconds: 15),
-      receiveTimeout: const Duration(seconds: 90),
-      headers: {'Content-Type': 'application/json'},
-    ),
-  );
+  static final Dio _dio = _createDio();
+
+  static Dio _createDio() {
+    final dio = Dio(
+      BaseOptions(
+        baseUrl: AppConstants.baseUrl,
+        connectTimeout: const Duration(seconds: 15),
+        receiveTimeout: const Duration(seconds: 90),
+        headers: {'Content-Type': 'application/json'},
+      ),
+    );
+    dio.interceptors.add(
+      InterceptorsWrapper(
+        onRequest: (options, handler) async {
+          final token = await SessionService.getToken();
+          if (token != null && token.isNotEmpty) {
+            options.headers['Authorization'] = 'Bearer $token';
+          }
+          handler.next(options);
+        },
+      ),
+    );
+    return dio;
+  }
 
   static Future<Map<String, dynamic>> getLatestMriPhotos(String userId) async {
     try {
@@ -19,10 +36,8 @@ class MriService {
       );
 
       if (response.statusCode == 200) {
-        // response.data = { status: "success", data: { user_id, photos: [...] } }
         final body = response.data as Map<String, dynamic>;
         final innerData = body['data'] as Map<String, dynamic>? ?? {};
-        // kembalikan langsung isi 'data', bukan seluruh body
         return {'status': 'success', 'data': innerData};
       }
       return {'status': 'error', 'message': 'Gagal mengambil data MRI'};
@@ -31,7 +46,9 @@ class MriService {
       return {
         'status': 'error',
         'message':
-            (respData is Map ? respData['message']?.toString() : null) ??
+            (respData is Map
+                ? (respData['detail'] ?? respData['message'])?.toString()
+                : null) ??
             e.message,
       };
     } catch (e) {

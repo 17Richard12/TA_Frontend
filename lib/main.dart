@@ -18,31 +18,45 @@ void main() async {
   final uid = await SessionService.getUid();
   final name = await SessionService.getName();
   final role = await SessionService.getRole() ?? 'user';
+  final token = await SessionService.getToken();
 
   Widget initialScreen = AuthScreen();
-  if (uid != null && name != null) {
+  if (uid != null && name != null && token != null && token.isNotEmpty) {
     bool? profileCompleted = await SessionService.getProfileCompleted();
-    if (profileCompleted == null) {
-      // Sesi lama sebelum fitur Mandatory Profile Guard: verifikasi ke server
-      final userRes = await AuthService().getUser(uid);
-      if (userRes['status'] == 'success') {
-        final userData = userRes['data'] as Map<String, dynamic>?;
-        profileCompleted = SessionService.isProfileDataComplete(
-          userData,
-          roleFallback: role,
-        );
-        await SessionService.setProfileCompleted(profileCompleted);
-      } else {
-        profileCompleted = SessionService.isProfileDataComplete(
-          null,
-          roleFallback: role,
-        );
+    final userRes = await AuthService().getUser(uid);
+    if (userRes['status'] == 'success') {
+      final userData = userRes['data'] as Map<String, dynamic>?;
+      final serverRole = (userData?['role']?.toString() ?? role)
+          .trim()
+          .toLowerCase();
+      if (serverRole != role) {
+        await SessionService.setRole(serverRole);
       }
+      profileCompleted = SessionService.isProfileDataComplete(
+        userData,
+        roleFallback: serverRole,
+      );
+      await SessionService.setProfileCompleted(profileCompleted);
+      initialScreen = profileCompleted
+          ? MainScreen(uid: uid, name: name, role: serverRole)
+          : OnboardingScreen(uid: uid, name: name, role: serverRole);
+    } else if (userRes['unauthorized'] == true) {
+      // Sesi kedaluwarsa / tidak valid -> bersihkan sesi dan arahkan ke halaman login
+      await SessionService.clearSession();
+      initialScreen = AuthScreen();
+    } else {
+      profileCompleted ??= SessionService.isProfileDataComplete(
+        null,
+        roleFallback: role,
+      );
+      initialScreen = profileCompleted
+          ? MainScreen(uid: uid, name: name, role: role)
+          : OnboardingScreen(uid: uid, name: name, role: role);
     }
-
-    initialScreen = profileCompleted
-        ? MainScreen(uid: uid, name: name, role: role)
-        : OnboardingScreen(uid: uid, name: name, role: role);
+  } else if (uid != null || name != null) {
+    // Sesi lama tanpa token autentikasi -> minta login ulang
+    await SessionService.clearSession();
+    initialScreen = AuthScreen();
   }
 
   runApp(MyApp(initialScreen: initialScreen));

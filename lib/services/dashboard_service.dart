@@ -1,16 +1,33 @@
 import 'package:flutter/foundation.dart';
 import 'package:lungs_assistant_agent/constants.dart';
+import 'package:lungs_assistant_agent/services/session_service.dart';
 import 'package:dio/dio.dart';
 
 class DashboardService {
-  static final Dio _dio = Dio(
-    BaseOptions(
-      baseUrl: AppConstants.baseUrl,
-      connectTimeout: const Duration(seconds: 15),
-      receiveTimeout: const Duration(seconds: 30),
-      headers: {'Content-Type': 'application/json'},
-    ),
-  );
+  static final Dio _dio = _createDio();
+
+  static Dio _createDio() {
+    final dio = Dio(
+      BaseOptions(
+        baseUrl: AppConstants.baseUrl,
+        connectTimeout: const Duration(seconds: 15),
+        receiveTimeout: const Duration(seconds: 30),
+        headers: {'Content-Type': 'application/json'},
+      ),
+    );
+    dio.interceptors.add(
+      InterceptorsWrapper(
+        onRequest: (options, handler) async {
+          final token = await SessionService.getToken();
+          if (token != null && token.isNotEmpty) {
+            options.headers['Authorization'] = 'Bearer $token';
+          }
+          handler.next(options);
+        },
+      ),
+    );
+    return dio;
+  }
 
   static Future<Map<String, dynamic>?> getDashboardData(
     String userId,
@@ -54,7 +71,9 @@ class DashboardService {
       return {
         'status': 'error',
         'message':
-            (respData is Map ? respData['message']?.toString() : null) ??
+            (respData is Map
+                ? (respData['detail'] ?? respData['message'])?.toString()
+                : null) ??
             e.message,
       };
     } catch (e) {

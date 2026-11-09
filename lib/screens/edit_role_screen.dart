@@ -141,7 +141,10 @@ class _EditUserRoleScreenState extends State<EditUserRoleScreen> {
                         ),
                         child: Row(
                           children: [
-                            const Icon(Icons.email_outlined, color: Colors.grey),
+                            const Icon(
+                              Icons.email_outlined,
+                              color: Colors.grey,
+                            ),
                             const SizedBox(width: 12),
                             Expanded(
                               child: Text(

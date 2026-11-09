@@ -219,13 +219,15 @@ class _LoginScreenState extends State<LoginScreen> {
                                                   roleFallback: role,
                                                 );
 
-                                            // 1. Simpan sesi login beserta status kelengkapan profil
+                                            // 1. Simpan sesi login beserta status kelengkapan profil & token
                                             await SessionService.saveSession(
                                               uid,
                                               name,
                                               role,
                                               profileCompleted:
                                                   isProfileComplete,
+                                              token: userData?['access_token']
+                                                  ?.toString(),
                                             );
 
                                             if (!context.mounted) return;

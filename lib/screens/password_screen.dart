@@ -14,46 +14,71 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
   static const Color primaryBlue = Color(0xFF2F60CC);
 
   final authService = AuthService();
+  final _currentPasswordController = TextEditingController();
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
 
+  bool _obscureCurrent = true;
   bool _obscurePassword = true;
   bool _obscureConfirm = true;
   bool _isLoading = false;
 
   @override
   void dispose() {
+    _currentPasswordController.dispose();
     _passwordController.dispose();
     _confirmPasswordController.dispose();
     super.dispose();
   }
 
-  Future<void> _onSave() async {
-    final password = _passwordController.text.trim();
-    final confirm = _confirmPasswordController.text.trim();
+  String? _validateStrongPassword(String password) {
+    if (password.length < 8) {
+      return 'Password minimal 8 karakter.';
+    }
+    if (!RegExp(r'(?=.*[A-Z])').hasMatch(password)) {
+      return 'Password harus mengandung minimal 1 huruf besar.';
+    }
+    if (!RegExp(r'(?=.*[a-z])').hasMatch(password)) {
+      return 'Password harus mengandung minimal 1 huruf kecil.';
+    }
+    if (!RegExp(r'(?=.*[0-9])').hasMatch(password)) {
+      return 'Password harus mengandung minimal 1 angka.';
+    }
+    return null;
+  }
 
-    if (password.isEmpty || confirm.isEmpty) {
-      _showSnackbar('Please fill in all fields.');
+  Future<void> _onSave() async {
+    final currentPassword = _currentPasswordController.text;
+    final password = _passwordController.text;
+    final confirm = _confirmPasswordController.text;
+
+    if (currentPassword.isEmpty || password.isEmpty || confirm.isEmpty) {
+      _showSnackbar('Harap isi semua kolom password.');
       return;
     }
     if (password != confirm) {
-      _showSnackbar('Passwords do not match.');
+      _showSnackbar('Konfirmasi password baru tidak cocok.');
       return;
     }
-    if (password.length < 6) {
-      _showSnackbar('Password must be at least 6 characters.');
+    final validationError = _validateStrongPassword(password);
+    if (validationError != null) {
+      _showSnackbar(validationError);
       return;
     }
 
     setState(() => _isLoading = true);
     try {
-      final result = await authService.changePassword(widget.uid, password);
+      final result = await authService.changePassword(
+        widget.uid,
+        currentPassword,
+        password,
+      );
       if (mounted) {
         if (result['status'] == 'success') {
-          _showSnackbar('Password changed successfully.');
+          _showSnackbar('Password berhasil diubah.');
           Navigator.pop(context);
         } else {
-          _showSnackbar(result['message'] ?? 'Failed to change password.');
+          _showSnackbar(result['message'] ?? 'Gagal mengubah password.');
         }
       }
     } finally {
@@ -62,9 +87,9 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
   }
 
   void _showSnackbar(String message) {
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(SnackBar(content: Text(message)));
+    final messenger = ScaffoldMessenger.of(context);
+    messenger.hideCurrentSnackBar();
+    messenger.showSnackBar(SnackBar(content: Text(message)));
   }
 
   @override
@@ -111,10 +136,20 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    _buildLabel('Password'),
+                    _buildLabel('Current Password'),
+                    _buildPasswordField(
+                      controller: _currentPasswordController,
+                      hint: 'Masukkan password saat ini',
+                      obscure: _obscureCurrent,
+                      onToggle: () =>
+                          setState(() => _obscureCurrent = !_obscureCurrent),
+                    ),
+                    const SizedBox(height: 16),
+
+                    _buildLabel('New Password'),
                     _buildPasswordField(
                       controller: _passwordController,
-                      hint: 'Enter new password',
+                      hint: 'Min 8 karakter, huruf besar, kecil & angka',
                       obscure: _obscurePassword,
                       onToggle: () =>
                           setState(() => _obscurePassword = !_obscurePassword),
@@ -124,7 +159,7 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
                     _buildLabel('Confirm Password'),
                     _buildPasswordField(
                       controller: _confirmPasswordController,
-                      hint: 'Re-enter new password',
+                      hint: 'Ulangi password baru',
                       obscure: _obscureConfirm,
                       onToggle: () =>
                           setState(() => _obscureConfirm = !_obscureConfirm),

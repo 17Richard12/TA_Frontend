@@ -5,6 +5,7 @@ class SessionService {
   static const String _keyUid = 'uid';
   static const String _keyName = 'name';
   static const String _keyRole = 'role';
+  static const String _keyToken = 'access_token';
   static const String _keyProfileCompleted = 'profile_completed';
 
   /// Helper untuk memeriksa apakah data profil user sudah lengkap.
@@ -16,7 +17,10 @@ class SessionService {
         .trim()
         .toLowerCase();
     // Dokter / master / admin tidak wajib onboarding profil pasien
-    if (role == 'dokter' || role == 'doctor' || role == 'master' || role == 'admin') {
+    if (role == 'dokter' ||
+        role == 'doctor' ||
+        role == 'master' ||
+        role == 'admin') {
       return true;
     }
     if (userData == null) return false;
@@ -34,20 +38,47 @@ class SessionService {
         weight > 0;
   }
 
-  // 1. Tambahkan parameter role & profileCompleted pada saveSession
   static Future<void> saveSession(
     String uid,
     String name,
     String role, {
     bool? profileCompleted,
+    String? token,
   }) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_keyUid, uid);
     await prefs.setString(_keyName, name);
-    await prefs.setString(_keyRole, role); // Simpan role
+    await prefs.setString(_keyRole, role);
     if (profileCompleted != null) {
       await prefs.setBool(_keyProfileCompleted, profileCompleted);
     }
+    if (token != null && token.isNotEmpty) {
+      await prefs.setString(_keyToken, token);
+    }
+  }
+
+  static Future<String?> getToken() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getString(_keyToken);
+  }
+
+  static Future<void> setToken(String token) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_keyToken, token);
+  }
+
+  static Future<Map<String, String>> getAuthHeaders({
+    bool jsonContent = true,
+  }) async {
+    final headers = <String, String>{};
+    if (jsonContent) {
+      headers['Content-Type'] = 'application/json';
+    }
+    final token = await getToken();
+    if (token != null && token.isNotEmpty) {
+      headers['Authorization'] = 'Bearer $token';
+    }
+    return headers;
   }
 
   // Get Profile Completed
@@ -74,13 +105,13 @@ class SessionService {
     return prefs.getString(_keyName);
   }
 
-  // Get Role (Gunakan konstanta _keyRole)
+  // Get Role
   static Future<String?> getRole() async {
     final prefs = await SharedPreferences.getInstance();
     return prefs.getString(_keyRole);
   }
 
-  // Set Role secara terpisah (Opsional jika dibutuhkan)
+  // Set Role secara terpisah
   static Future<void> setRole(String role) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_keyRole, role);
@@ -103,12 +134,12 @@ class SessionService {
     await prefs.setBool('has_seen_app_tour_$uid', true);
   }
 
-  // 2. Pastikan role & status profil ikut dihapus saat logout
   static Future<void> clearSession() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove(_keyUid);
     await prefs.remove(_keyName);
-    await prefs.remove(_keyRole); // Hapus role
+    await prefs.remove(_keyRole);
+    await prefs.remove(_keyToken);
     await prefs.remove(_keyProfileCompleted);
     SmokeSync.instance.reset();
   }

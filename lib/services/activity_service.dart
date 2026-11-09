@@ -1,16 +1,13 @@
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:lungs_assistant_agent/constants.dart';
+import 'package:lungs_assistant_agent/services/session_service.dart';
 import 'package:http/http.dart' as http;
 
 class ActivityService {
-  // TODO: Sesuaikan dengan URL backend kamu.
-  // Jika menggunakan emulator Android, gunakan http://10.0.2.2:8000
-  // Jika real device/hosting, gunakan IP/Domain yang sesuai.
   static const String baseUrl = '${AppConstants.baseUrl}/api/activities';
 
   /// Fetch data dari endpoint POST /activities/process
-  /// Mengembalikan Map penuh agar kita bisa mendapatkan root 'id' (dailyActivityId)
   static Future<Map<String, dynamic>?> getDailyActivity(
     String userUid,
     String timestamp,
@@ -18,16 +15,16 @@ class ActivityService {
     final url = Uri.parse('$baseUrl/process');
 
     try {
+      final headers = await SessionService.getAuthHeaders();
       final response = await http.post(
         url,
-        headers: {'Content-Type': 'application/json'},
+        headers: headers,
         body: jsonEncode({'user_uid': userUid, 'timestamp': timestamp}),
       );
 
       if (response.statusCode == 200) {
         final jsonResponse = jsonDecode(response.body);
         if (jsonResponse['status'] == 'success') {
-          // Mengembalikan objek data yang berisi {id, user_uid, timestamp, activities: [...]}
           return jsonResponse['data'];
         }
       }
@@ -48,9 +45,10 @@ class ActivityService {
     final url = Uri.parse('$baseUrl/$dailyActivityId/items/$activityId/check');
 
     try {
+      final headers = await SessionService.getAuthHeaders();
       final response = await http.patch(
         url,
-        headers: {'Content-Type': 'application/json'},
+        headers: headers,
         body: jsonEncode({'done': isDone}),
       );
 
@@ -77,7 +75,8 @@ class ActivityService {
     );
 
     try {
-      final response = await http.get(url);
+      final headers = await SessionService.getAuthHeaders(jsonContent: false);
+      final response = await http.get(url, headers: headers);
 
       if (response.statusCode == 200) {
         final jsonResponse = jsonDecode(response.body);
@@ -98,7 +97,8 @@ class ActivityService {
       '$baseUrl/streak?user_id=$userId&timestamp=$timestamp',
     );
     try {
-      final response = await http.get(url);
+      final headers = await SessionService.getAuthHeaders(jsonContent: false);
+      final response = await http.get(url, headers: headers);
       if (response.statusCode == 200) {
         final jsonResponse = jsonDecode(response.body);
         if (jsonResponse['status'] == 'success') {

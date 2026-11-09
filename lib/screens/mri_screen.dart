@@ -49,8 +49,7 @@ class _MriScreenState extends State<MriScreen> {
               dataList.isNotEmpty && dataList[0] is Map<String, dynamic>
               ? dataList[0] as Map<String, dynamic>
               : null;
-          _olderMri =
-              dataList.length > 1 && dataList[1] is Map<String, dynamic>
+          _olderMri = dataList.length > 1 && dataList[1] is Map<String, dynamic>
               ? dataList[1] as Map<String, dynamic>
               : null;
 
@@ -276,7 +275,10 @@ class _MriScreenState extends State<MriScreen> {
 
       setState(() => _isUploading = true);
 
-      final base64Image = 'data:image/jpeg;base64,${base64Encode(bytes)}';
+      final mimeType = ext == 'png'
+          ? 'image/png'
+          : (ext == 'webp' ? 'image/webp' : 'image/jpeg');
+      final base64Image = 'data:$mimeType;base64,${base64Encode(bytes)}';
 
       final result = await MriService.uploadMriPhoto(
         widget.userUid,

@@ -149,10 +149,14 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
           profileData['bloodType'] = _bloodTypeController.text.trim();
         }
         if (_weightController.text.trim().isNotEmpty) {
-          profileData['weight'] = double.tryParse(_weightController.text.trim());
+          profileData['weight'] = double.tryParse(
+            _weightController.text.trim(),
+          );
         }
         if (_heightController.text.trim().isNotEmpty) {
-          profileData['height'] = double.tryParse(_heightController.text.trim());
+          profileData['height'] = double.tryParse(
+            _heightController.text.trim(),
+          );
         }
         if (_historySicknessController.text.trim().isNotEmpty) {
           profileData['history'] = _historySicknessController.text.trim();

@@ -134,25 +134,9 @@ class _HospitalScreenState extends State<HospitalScreen> {
     final double lat = (hospital['lat'] as num).toDouble();
     final double lng = (hospital['lng'] as num).toDouble();
     final dynamic rating = hospital['rating'];
+    final bool? openNow = hospital['open_now'] as bool?;
     final List<dynamic> schedules =
-        (hospital['doctor_schedules'] as List<dynamic>?) ??
-        const [
-          {
-            'poli': 'Poli Spesialis Paru & Pernapasan (Sp.P)',
-            'days': 'Senin – Jumat',
-            'hours': '08:00 – 15:00 WIB',
-          },
-          {
-            'poli': 'Poli Penyakit Dalam',
-            'days': 'Senin – Sabtu',
-            'hours': '09:00 – 17:00 WIB',
-          },
-          {
-            'poli': 'IGD & Layanan Darurat Respirasi',
-            'days': 'Setiap Hari',
-            'hours': '24 Jam',
-          },
-        ];
+        (hospital['doctor_schedules'] as List<dynamic>?) ?? const [];
 
     showModalBottomSheet(
       context: context,
@@ -217,24 +201,51 @@ class _HospitalScreenState extends State<HospitalScreen> {
                           ),
                         ),
                       ],
-                      if (rating != null) ...[
+                      if (rating != null || openNow != null) ...[
                         const SizedBox(height: 6),
                         Row(
                           children: [
-                            const Icon(
-                              Icons.star_rounded,
-                              color: Colors.amber,
-                              size: 18,
-                            ),
-                            const SizedBox(width: 4),
-                            Text(
-                              '$rating / 5.0',
-                              style: const TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.w600,
-                                color: Colors.black87,
+                            if (rating != null) ...[
+                              const Icon(
+                                Icons.star_rounded,
+                                color: Colors.amber,
+                                size: 18,
                               ),
-                            ),
+                              const SizedBox(width: 4),
+                              Text(
+                                '$rating / 5.0',
+                                style: const TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600,
+                                  color: Colors.black87,
+                                ),
+                              ),
+                            ],
+                            if (rating != null && openNow != null)
+                              const SizedBox(width: 10),
+                            if (openNow != null)
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 8,
+                                  vertical: 2,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: openNow
+                                      ? Colors.green.shade50
+                                      : Colors.red.shade50,
+                                  borderRadius: BorderRadius.circular(6),
+                                ),
+                                child: Text(
+                                  openNow ? 'Buka Saat Ini' : 'Tutup',
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w600,
+                                    color: openNow
+                                        ? Colors.green.shade700
+                                        : Colors.red.shade700,
+                                  ),
+                                ),
+                              ),
                           ],
                         ),
                       ],
@@ -248,11 +259,7 @@ class _HospitalScreenState extends State<HospitalScreen> {
             const SizedBox(height: 16),
             const Row(
               children: [
-                Icon(
-                  Icons.schedule_rounded,
-                  size: 18,
-                  color: primaryDark,
-                ),
+                Icon(Icons.schedule_rounded, size: 18, color: primaryDark),
                 SizedBox(width: 8),
                 Text(
                   'Jadwal Praktik Dokter & Layanan Paru',
@@ -265,67 +272,98 @@ class _HospitalScreenState extends State<HospitalScreen> {
               ],
             ),
             const SizedBox(height: 12),
-            ...schedules.map((item) {
-              final s = item as Map<String, dynamic>;
-              return Container(
-                margin: const EdgeInsets.only(bottom: 10),
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 14,
-                  vertical: 10,
-                ),
+            if (schedules.isEmpty)
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(14),
                 decoration: BoxDecoration(
                   color: const Color(0xFFF5F6FF),
                   borderRadius: BorderRadius.circular(12),
                 ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                child: const Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            s['poli']?.toString() ?? '-',
-                            style: const TextStyle(
-                              fontWeight: FontWeight.w600,
-                              fontSize: 13,
-                              color: Colors.black87,
-                            ),
-                          ),
-                          const SizedBox(height: 2),
-                          Text(
-                            s['days']?.toString() ?? '-',
-                            style: const TextStyle(
-                              fontSize: 12,
-                              color: Colors.black54,
-                            ),
-                          ),
-                        ],
-                      ),
+                    Icon(
+                      Icons.info_outline_rounded,
+                      color: primaryBlue,
+                      size: 20,
                     ),
-                    const SizedBox(width: 8),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 10,
-                        vertical: 4,
-                      ),
-                      decoration: BoxDecoration(
-                        color: primaryBlue.withValues(alpha: 0.12),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
+                    SizedBox(width: 10),
+                    Expanded(
                       child: Text(
-                        s['hours']?.toString() ?? '-',
-                        style: const TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.bold,
-                          color: primaryBlue,
+                        'Jadwal resmi praktik dokter spesialis paru belum tersedia dari Google Maps. Silakan hubungi pihak rumah sakit secara langsung untuk konfirmasi jam praktik dokter.',
+                        style: TextStyle(
+                          fontSize: 12.5,
+                          color: Colors.black87,
+                          height: 1.4,
                         ),
                       ),
                     ),
                   ],
                 ),
-              );
-            }),
+              )
+            else
+              ...schedules.map((item) {
+                final s = item as Map<String, dynamic>;
+                return Container(
+                  margin: const EdgeInsets.only(bottom: 10),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 10,
+                  ),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF5F6FF),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              s['poli']?.toString() ?? '-',
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w600,
+                                fontSize: 13,
+                                color: Colors.black87,
+                              ),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              s['days']?.toString() ?? '-',
+                              style: const TextStyle(
+                                fontSize: 12,
+                                color: Colors.black54,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 4,
+                        ),
+                        decoration: BoxDecoration(
+                          color: primaryBlue.withValues(alpha: 0.12),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Text(
+                          s['hours']?.toString() ?? '-',
+                          style: const TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.bold,
+                            color: primaryBlue,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              }),
             const SizedBox(height: 16),
             SizedBox(
               width: double.infinity,
@@ -338,10 +376,7 @@ class _HospitalScreenState extends State<HospitalScreen> {
                 icon: const Icon(Icons.directions_rounded),
                 label: const Text(
                   'Arahkan Rute',
-                  style: TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.bold,
-                  ),
+                  style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
                 ),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: primaryDark,

@@ -151,8 +151,7 @@ class _AccountScreenState extends State<AccountScreen> {
 
                   if (result['status'] == 'success') {
                     if (!context.mounted) return;
-                    final updatedData =
-                        await Navigator.push<Map<String, dynamic>>(
+                    final updatedData = await Navigator.push<Map<String, dynamic>>(
                       context,
                       MaterialPageRoute(
                         builder: (_) => EditProfileScreen(
@@ -166,8 +165,7 @@ class _AccountScreenState extends State<AccountScreen> {
                     );
                     if (!mounted) return;
                     await _fetchUserData();
-                    if (updatedData != null &&
-                        updatedData['name'] != null) {
+                    if (updatedData != null && updatedData['name'] != null) {
                       final newName = updatedData['name'] as String;
                       setState(() => _name = newName);
                       // Update name in session
@@ -189,9 +187,8 @@ class _AccountScreenState extends State<AccountScreen> {
                     await Navigator.push(
                       context,
                       MaterialPageRoute(
-                        builder: (_) => PatientListScreen(
-                          currentUserRole: widget.role,
-                        ),
+                        builder: (_) =>
+                            PatientListScreen(currentUserRole: widget.role),
                       ),
                     );
                     if (mounted) {
@@ -210,9 +207,8 @@ class _AccountScreenState extends State<AccountScreen> {
                     await Navigator.push(
                       context,
                       MaterialPageRoute(
-                        builder: (_) => MasterUserListScreen(
-                          currentUserRole: widget.role,
-                        ),
+                        builder: (_) =>
+                            MasterUserListScreen(currentUserRole: widget.role),
                       ),
                     );
                     if (mounted) {
@@ -237,10 +233,7 @@ class _AccountScreenState extends State<AccountScreen> {
                       foregroundColor: primaryBlue,
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(14),
-                        side: const BorderSide(
-                          color: primaryBlue,
-                          width: 1.5,
-                        ),
+                        side: const BorderSide(color: primaryBlue, width: 1.5),
                       ),
                       elevation: 0,
                     ),

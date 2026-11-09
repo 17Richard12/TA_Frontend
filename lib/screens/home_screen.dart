@@ -191,8 +191,7 @@ class _HomeScreenState extends State<HomeScreen> {
     final nextCount = _smokeCount + 1;
     final bool willExceedHigh =
         _smokeLimitHigh > 0 && nextCount >= _smokeLimitHigh;
-    final bool willReachLow =
-        _smokeLimitLow > 0 && nextCount >= _smokeLimitLow;
+    final bool willReachLow = _smokeLimitLow > 0 && nextCount >= _smokeLimitLow;
 
     String warningNote =
         'Coba selesaikan daily activities-mu untuk mengalihkan rasa ingin merokok.\n\nApakah kamu yakin ingin tetap menambah jumlah rokok?';
@@ -435,29 +434,33 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _updateSmokeCount(int newCount) async {
+    final clampedCount = newCount.clamp(0, 200);
+    final previousCount = _smokeCount;
     // Optimistic UI: angka langsung berubah di Home
-    setState(() => _smokeCount = newCount);
+    setState(() => _smokeCount = clampedCount);
 
     // Penulisan diserialisasi oleh SmokeSync agar urutan tap cepat tetap benar
     // dan halaman Report dapat menunggu sampai data benar-benar tersimpan.
     final success = await SmokeSync.instance.setCount(
       widget.userUid,
       _todayTimestamp,
-      newCount,
+      clampedCount,
     );
 
     if (!mounted) return;
     if (!success) {
-      final confirmed = SmokeSync.instance.confirmedCountFor(
-        widget.userUid,
-        _todayTimestamp,
-      );
-      setState(() => _smokeCount = confirmed ?? _smokeCount);
-      _showAlertBottomSheet(
-        title: 'Gagal Menyimpan Smoke Count',
-        message:
-            'Jumlah rokok gagal disimpan ke server. Periksa koneksi internetmu lalu coba lagi.',
-      );
+      if (!SmokeSync.instance.hasPendingWrites) {
+        final confirmed = SmokeSync.instance.confirmedCountFor(
+          widget.userUid,
+          _todayTimestamp,
+        );
+        setState(() => _smokeCount = confirmed ?? previousCount);
+        _showAlertBottomSheet(
+          title: 'Gagal Menyimpan Smoke Count',
+          message:
+              'Jumlah rokok gagal disimpan ke server. Periksa koneksi internetmu lalu coba lagi.',
+        );
+      }
     } else {
       if (!SmokeSync.instance.hasPendingWrites) {
         _loadWeeklyReport();
@@ -466,7 +469,7 @@ class _HomeScreenState extends State<HomeScreen> {
       await NotificationService.instance.checkAndNotifySmokeLimit(
         userId: widget.userUid,
         dateStr: _todayTimestamp,
-        smokeCount: newCount,
+        smokeCount: clampedCount,
         lowLimit: _smokeLimitLow,
         highLimit: _smokeLimitHigh,
       );
