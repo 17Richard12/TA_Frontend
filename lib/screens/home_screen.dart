@@ -5,6 +5,7 @@ import 'package:lungs_assistant_agent/services/youtube_service.dart';
 import 'package:lungs_assistant_agent/services/smoke_service.dart';
 import 'package:lungs_assistant_agent/services/activity_service.dart';
 import 'package:lungs_assistant_agent/services/auth_service.dart';
+import 'package:lungs_assistant_agent/services/dashboard_service.dart';
 import 'package:lungs_assistant_agent/services/notification_service.dart';
 import 'package:lungs_assistant_agent/state/smoke_sync.dart';
 import 'package:flutter/material.dart';
@@ -47,6 +48,11 @@ class _HomeScreenState extends State<HomeScreen> {
   int _currentStreak = 0;
   bool _streakLoading = true;
 
+  // State untuk Analisa AI Rangkuman & Feedback Kemarin
+  bool _yesterdaySummaryLoading = true;
+  Map<String, dynamic>? _yesterdaySummaryData;
+  String? _yesterdaySummaryError;
+
   // State untuk Activities (Diubah dari FutureBuilder ke local state agar mendukung UI real-time)
   bool _activitiesLoading = true;
   String? _dailyActivityId;
@@ -79,9 +85,38 @@ class _HomeScreenState extends State<HomeScreen> {
     _loadOxygenLevel();
     _loadUserSmokeLimits();
     _loadSmokeCount();
+    _loadYesterdayAiSummary();
     _loadWeeklyReport();
     _loadWeeklyActivityReport();
     _loadStreak();
+  }
+
+  Future<void> _loadYesterdayAiSummary({bool forceRefresh = false}) async {
+    if (!mounted) return;
+    setState(() {
+      _yesterdaySummaryLoading = true;
+      _yesterdaySummaryError = null;
+    });
+
+    final res = await DashboardService.getYesterdayAiSummary(
+      widget.userUid,
+      date: _todayTimestamp,
+      forceRefresh: forceRefresh,
+    );
+
+    if (!mounted) return;
+    if (res['status'] == 'success' && res['data'] is Map<String, dynamic>) {
+      setState(() {
+        _yesterdaySummaryData = res['data'] as Map<String, dynamic>;
+        _yesterdaySummaryLoading = false;
+      });
+    } else {
+      setState(() {
+        _yesterdaySummaryError =
+            res['message']?.toString() ?? 'Gagal memuat analisa AI kemarin.';
+        _yesterdaySummaryLoading = false;
+      });
+    }
   }
 
   Future<void> _loadUserSmokeLimits() async {
@@ -804,6 +839,280 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  Widget _buildYesterdayMetricChip({
+    required IconData icon,
+    required String label,
+    required Color color,
+  }) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 14, color: color),
+          const SizedBox(width: 5),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w600,
+              color: color,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildYesterdayAiSummaryCard() {
+    final data = _yesterdaySummaryData ?? {};
+    final yesterdayDate = (data['yesterday_date'] ?? 'Kemarin').toString();
+    final smokeYesterday =
+        int.tryParse((data['smoke_count_total'] ?? 0).toString()) ?? 0;
+    final limitLow =
+        int.tryParse((data['smoke_limit_low'] ?? _smokeLimitLow).toString()) ??
+        _smokeLimitLow;
+    final activitiesDone =
+        int.tryParse((data['daily_activities_done_total'] ?? 0).toString()) ??
+        0;
+    final activitiesTotal =
+        int.tryParse((data['daily_activities_total'] ?? 0).toString()) ?? 0;
+    final chatTotal = int.tryParse((data['chat_total'] ?? 0).toString()) ?? 0;
+
+    final summaryText = (data['summary'] ?? '').toString().trim();
+    final feedbackText = (data['feedback'] ?? '').toString().trim();
+
+    final Color smokeChipColor = smokeYesterday == 0
+        ? accentGreen
+        : (smokeYesterday <= limitLow ? Colors.orange : Colors.redAccent);
+
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 20),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.06),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: primaryDark.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Icon(
+                  Icons.auto_awesome_rounded,
+                  color: primaryDark,
+                  size: 20,
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Analisa AI & Feedback Kemarin',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.black87,
+                      ),
+                    ),
+                    Text(
+                      'Data H-1 ($yesterdayDate)',
+                      style: const TextStyle(fontSize: 11, color: textSub),
+                    ),
+                  ],
+                ),
+              ),
+              IconButton(
+                onPressed: _yesterdaySummaryLoading
+                    ? null
+                    : () => _loadYesterdayAiSummary(forceRefresh: true),
+                tooltip: 'Perbarui Analisa AI',
+                visualDensity: VisualDensity.compact,
+                icon: const Icon(
+                  Icons.refresh_rounded,
+                  color: accentBlue,
+                  size: 20,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          if (_yesterdaySummaryLoading)
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 16),
+              child: Center(
+                child: SizedBox(
+                  width: 22,
+                  height: 22,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: accentBlue,
+                  ),
+                ),
+              ),
+            )
+          else if (_yesterdaySummaryError != null && summaryText.isEmpty)
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.orange.withValues(alpha: 0.08),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Row(
+                children: [
+                  const Icon(
+                    Icons.info_outline_rounded,
+                    color: Colors.orange,
+                    size: 18,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      _yesterdaySummaryError!,
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: Colors.black87,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            )
+          else ...[
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                _buildYesterdayMetricChip(
+                  icon: Icons.smoking_rooms_rounded,
+                  label: '$smokeYesterday btg kemarin',
+                  color: smokeChipColor,
+                ),
+                _buildYesterdayMetricChip(
+                  icon: Icons.task_alt_rounded,
+                  label: activitiesTotal > 0
+                      ? '$activitiesDone/$activitiesTotal aktivitas'
+                      : '$activitiesDone aktivitas selesai',
+                  color: accentBlue,
+                ),
+                if (chatTotal > 0)
+                  _buildYesterdayMetricChip(
+                    icon: Icons.chat_bubble_outline_rounded,
+                    label: '$chatTotal konsultasi',
+                    color: primaryDark,
+                  ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF5F8FF),
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: primaryDark.withValues(alpha: 0.1)),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Rangkuman Kemarin',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                      color: primaryDark,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    summaryText.isNotEmpty
+                        ? summaryText
+                        : 'Belum ada rangkuman aktivitas kemarin.',
+                    style: const TextStyle(
+                      fontSize: 12.5,
+                      height: 1.45,
+                      color: Colors.black87,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            if (feedbackText.isNotEmpty) ...[
+              const SizedBox(height: 10),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: accentBlue.withValues(alpha: 0.08),
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: accentBlue.withValues(alpha: 0.25)),
+                ),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Padding(
+                      padding: EdgeInsets.only(top: 2),
+                      child: Icon(
+                        Icons.tips_and_updates_rounded,
+                        size: 16,
+                        color: accentBlue,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'Feedback & Saran Hari Ini',
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                              color: primaryDark,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            feedbackText,
+                            style: const TextStyle(
+                              fontSize: 12.5,
+                              height: 1.45,
+                              color: Colors.black87,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ],
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -995,6 +1304,11 @@ class _HomeScreenState extends State<HomeScreen> {
                         ),
                       ),
                     ),
+
+                    const SizedBox(height: 10),
+
+                    // ANALISA AI RANGKUMAN & FEEDBACK KEMARIN
+                    _buildYesterdayAiSummaryCard(),
 
                     const SizedBox(height: 10),
 

@@ -80,4 +80,54 @@ class DashboardService {
       return {'status': 'error', 'message': e.toString()};
     }
   }
+
+  static Future<Map<String, dynamic>> getYesterdayAiSummary(
+    String userId, {
+    String? date,
+    bool forceRefresh = false,
+  }) async {
+    try {
+      final queryParams = <String, dynamic>{
+        'user_id': userId,
+        'force_refresh': forceRefresh,
+      };
+      if (date != null && date.isNotEmpty) {
+        queryParams['date'] = date;
+      }
+
+      final response = await _dio.get(
+        '/api/dashboard/yesterday-ai-summary',
+        queryParameters: queryParams,
+      );
+
+      if (response.statusCode == 200 && response.data is Map<String, dynamic>) {
+        final body = response.data as Map<String, dynamic>;
+        if (body['status'] == 'success') {
+          return {
+            'status': 'success',
+            'data': body['data'] as Map<String, dynamic>? ?? {},
+          };
+        }
+        return {
+          'status': 'error',
+          'message':
+              body['message']?.toString() ?? 'Gagal memuat rangkuman AI.',
+        };
+      }
+      return {'status': 'error', 'message': 'Gagal memuat rangkuman AI.'};
+    } on DioException catch (e) {
+      final respData = e.response?.data;
+      return {
+        'status': 'error',
+        'message':
+            (respData is Map
+                ? (respData['detail'] ?? respData['message'])?.toString()
+                : null) ??
+            e.message ??
+            'Gagal memuat rangkuman AI.',
+      };
+    } catch (e) {
+      return {'status': 'error', 'message': e.toString()};
+    }
+  }
 }
