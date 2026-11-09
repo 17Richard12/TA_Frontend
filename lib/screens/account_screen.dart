@@ -299,9 +299,18 @@ class _AccountScreenState extends State<AccountScreen> {
           ),
           ElevatedButton(
             onPressed: () async {
-              await SessionService.clearSession();
+              final cleared = await SessionService.clearSession();
               if (context.mounted) {
                 Navigator.pop(ctx); // Close dialog
+                if (!cleared) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text(
+                        'Sesi lokal telah ditutup, namun pembersihan penyimpanan aman mengalami kendala.',
+                      ),
+                    ),
+                  );
+                }
                 Navigator.of(context).pushAndRemoveUntil(
                   MaterialPageRoute(builder: (context) => AuthScreen()),
                   (Route<dynamic> route) => false,

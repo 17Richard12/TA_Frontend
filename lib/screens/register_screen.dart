@@ -239,19 +239,35 @@ class _RegisterScreenState extends State<RegisterScreen> {
                                         if (mounted) {
                                           if (result['status'] == 'success') {
                                             // 1. Simpan sesi login (profil belum lengkap setelah register)
-                                            await SessionService.saveSession(
-                                              result['uid']?.toString() ?? '',
-                                              result['data']['name']
-                                                      ?.toString() ??
-                                                  'User',
-                                              result['data']['role']
-                                                      ?.toString() ??
-                                                  'user', // Beri nilai default 'user' jika null
-                                              profileCompleted: false,
-                                              token:
-                                                  result['data']['access_token']
-                                                      ?.toString(),
-                                            );
+                                            try {
+                                              await SessionService.saveSession(
+                                                result['uid']?.toString() ?? '',
+                                                result['data']['name']
+                                                        ?.toString() ??
+                                                    'User',
+                                                result['data']['role']
+                                                        ?.toString() ??
+                                                    'user', // Beri nilai default 'user' jika null
+                                                profileCompleted: false,
+                                                token:
+                                                    result['data']['access_token']
+                                                        ?.toString(),
+                                              );
+                                            } on SecureSessionStorageException catch (
+                                              e
+                                            ) {
+                                              if (!context.mounted) return;
+                                              ScaffoldMessenger.of(
+                                                context,
+                                              ).showSnackBar(
+                                                SnackBar(
+                                                  content: Text(e.message),
+                                                  backgroundColor:
+                                                      Colors.redAccent,
+                                                ),
+                                              );
+                                              return;
+                                            }
 
                                             if (!context.mounted) return;
 

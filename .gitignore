@@ -11,8 +11,26 @@ pubspec.lock
 # If you don't generate documentation locally you can remove this line.
 doc/api/
 
-# dotenv environment variables file
+# dotenv & local dart-define / native secret files (never commit)
 .env*
+*.env
+dart_defines.json
+dart_defines.*.json
+ios/Flutter/MapsSecrets.xcconfig
+ios/Flutter/*Secrets*.xcconfig
+android/local.properties
+android/key.properties
+*firebase-adminsdk*.json
+*service-account*.json
+*serviceAccount*.json
+
+# macOS & Temporary Files
+.DS_Store
+**/.DS_Store
+*.tmp
+*.bak
+*.swp
+*~
 
 # Avoid committing generated Javascript files:
 *.dart.js

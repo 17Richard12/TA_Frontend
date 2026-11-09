@@ -1,3 +1,4 @@
+import java.util.Base64
 import java.util.Properties
 
 plugins {
@@ -15,10 +16,30 @@ val localPropertiesFile = rootProject.file("local.properties")
 if (localPropertiesFile.exists()) {
     localPropertiesFile.inputStream().use { localProperties.load(it) }
 }
+
+val dartEnvironmentVariables = mutableMapOf<String, String>()
+if (project.hasProperty("dart-defines")) {
+    val rawDefines = project.property("dart-defines") as String
+    rawDefines.split(",").forEach { encoded ->
+        if (encoded.isNotBlank()) {
+            val decoded = String(Base64.getDecoder().decode(encoded), Charsets.UTF_8)
+            val parts = decoded.split("=", limit = 2)
+            if (parts.size == 2) {
+                dartEnvironmentVariables[parts[0]] = parts[1]
+            }
+        }
+    }
+}
+
 val mapsApiKey: String =
-    localProperties.getProperty("MAPS_API_KEY")
-        ?: System.getenv("MAPS_API_KEY")
+    localProperties.getProperty("MAPS_API_KEY")?.takeIf { it.isNotBlank() }
+        ?: dartEnvironmentVariables["MAPS_API_KEY"]?.takeIf { it.isNotBlank() }
+        ?: System.getenv("MAPS_API_KEY")?.takeIf { it.isNotBlank() }
         ?: ""
+
+if (mapsApiKey.isEmpty()) {
+    logger.warn("[LungsAssistant] WARNING: MAPS_API_KEY is not configured in android/local.properties, --dart-define, or environment variables.")
+}
 
 android {
     namespace = "com.example.agent_doctor"

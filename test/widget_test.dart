@@ -16,13 +16,93 @@ import 'package:lungs_assistant_agent/screens/password_screen.dart';
 import 'package:lungs_assistant_agent/screens/edit_screen.dart';
 import 'package:lungs_assistant_agent/screens/edit_role_screen.dart';
 import 'package:lungs_assistant_agent/services/hospital_service.dart';
+import 'package:lungs_assistant_agent/services/news_service.dart';
 import 'package:lungs_assistant_agent/services/session_service.dart';
+import 'package:lungs_assistant_agent/services/youtube_service.dart';
 import 'package:lungs_assistant_agent/state/smoke_sync.dart';
+
+class _ConfigurableSecureStorage extends FlutterSecureStorage {
+  final Map<String, String> _memory = {};
+  bool failRead = false;
+  bool failWrite = false;
+  bool failDelete = false;
+
+  _ConfigurableSecureStorage();
+
+  @override
+  Future<String?> read({
+    required String key,
+    AppleOptions? iOptions,
+    AndroidOptions? aOptions,
+    LinuxOptions? lOptions,
+    WebOptions? webOptions,
+    AppleOptions? mOptions,
+    WindowsOptions? wOptions,
+  }) async {
+    if (failRead) {
+      throw Exception('Simulated secure storage read failure');
+    }
+    return _memory[key];
+  }
+
+  @override
+  Future<void> write({
+    required String key,
+    required String? value,
+    AppleOptions? iOptions,
+    AndroidOptions? aOptions,
+    LinuxOptions? lOptions,
+    WebOptions? webOptions,
+    AppleOptions? mOptions,
+    WindowsOptions? wOptions,
+  }) async {
+    if (failWrite) {
+      throw Exception('Simulated secure storage write failure');
+    }
+    if (value == null) {
+      _memory.remove(key);
+    } else {
+      _memory[key] = value;
+    }
+  }
+
+  @override
+  Future<void> delete({
+    required String key,
+    AppleOptions? iOptions,
+    AndroidOptions? aOptions,
+    LinuxOptions? lOptions,
+    WebOptions? webOptions,
+    AppleOptions? mOptions,
+    WindowsOptions? wOptions,
+  }) async {
+    if (failDelete) {
+      throw Exception('Simulated secure storage delete failure');
+    }
+    _memory.remove(key);
+  }
+
+  @override
+  Future<void> deleteAll({
+    AppleOptions? iOptions,
+    AndroidOptions? aOptions,
+    LinuxOptions? lOptions,
+    WebOptions? webOptions,
+    AppleOptions? mOptions,
+    WindowsOptions? wOptions,
+  }) async {
+    if (failDelete) {
+      throw Exception('Simulated secure storage deleteAll failure');
+    }
+    _memory.clear();
+  }
+}
 
 void main() {
   setUp(() {
     SharedPreferences.setMockInitialValues({});
     FlutterSecureStorage.setMockInitialValues({});
+    SessionService.resetSecureStorageForTesting();
     SmokeSync.instance.reset();
   });
 
@@ -220,6 +300,82 @@ void main() {
           throwsException,
         );
         expect(await SessionService.getToken(), isNull);
+      },
+    );
+
+    test(
+      'handles secure-storage read, write, migration, and deletion failures safely without plaintext fallback',
+      () async {
+        final fakeStorage = _ConfigurableSecureStorage();
+        SessionService.setSecureStorageForTesting(fakeStorage);
+
+        // 1. Write failure during saveSession throws SecureSessionStorageException and does not persist session
+        fakeStorage.failWrite = true;
+        await expectLater(
+          SessionService.saveSession(
+            'uid_fail',
+            'Fail User',
+            'user',
+            token: 'token_cannot_write',
+          ),
+          throwsA(isA<SecureSessionStorageException>()),
+        );
+        expect(await SessionService.getUid(), isNull);
+        final prefsAfterWriteFail = await SharedPreferences.getInstance();
+        expect(prefsAfterWriteFail.getString('access_token'), isNull);
+
+        // 2. Migration failure from legacy SharedPreferences never returns legacy token as migrated
+        SharedPreferences.setMockInitialValues({
+          'uid': 'uid_legacy_fail',
+          'name': 'Legacy Fail User',
+          'access_token': 'legacy_token_should_not_leak',
+        });
+        fakeStorage.failWrite = true;
+        final failedMigratedToken = await SessionService.getToken();
+        expect(failedMigratedToken, isNull);
+        final prefsAfterMigrationFail = await SharedPreferences.getInstance();
+        expect(prefsAfterMigrationFail.getString('access_token'), isNull);
+        expect(await SessionService.getUid(), isNull);
+
+        // 3. Read failure returns null and purges any leftover plaintext token
+        fakeStorage.failWrite = false;
+        await SessionService.saveSession(
+          'uid_ok',
+          'OK User',
+          'user',
+          token: 'valid_token_123',
+        );
+        expect(await SessionService.getToken(), equals('valid_token_123'));
+
+        fakeStorage.failRead = true;
+        expect(await SessionService.getToken(), isNull);
+        fakeStorage.failRead = false;
+
+        // 4. Deletion failure during clearSession still clears SharedPreferences & SmokeSync and returns false
+        SmokeSync.instance.seed('uid_ok', '2026-11-09', 3);
+        fakeStorage.failDelete = true;
+        final deletedCleanly = await SessionService.clearSession();
+        expect(deletedCleanly, isFalse);
+        expect(await SessionService.getUid(), isNull);
+        expect(await SessionService.getName(), isNull);
+        expect(
+          SmokeSync.instance.confirmedCountFor('uid_ok', '2026-11-09'),
+          isNull,
+        );
+      },
+    );
+
+    test(
+      'NewsService and YouTubeService report clear configuration error when API keys are not provided',
+      () async {
+        await expectLater(
+          NewsService.fetchTopHeadlines(),
+          throwsA(isA<StateError>()),
+        );
+        await expectLater(
+          YouTubeService.fetchVideos(),
+          throwsA(isA<StateError>()),
+        );
       },
     );
   });

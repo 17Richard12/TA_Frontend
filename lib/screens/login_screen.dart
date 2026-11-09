@@ -220,15 +220,31 @@ class _LoginScreenState extends State<LoginScreen> {
                                                 );
 
                                             // 1. Simpan sesi login beserta status kelengkapan profil & token
-                                            await SessionService.saveSession(
-                                              uid,
-                                              name,
-                                              role,
-                                              profileCompleted:
-                                                  isProfileComplete,
-                                              token: userData?['access_token']
-                                                  ?.toString(),
-                                            );
+                                            try {
+                                              await SessionService.saveSession(
+                                                uid,
+                                                name,
+                                                role,
+                                                profileCompleted:
+                                                    isProfileComplete,
+                                                token: userData?['access_token']
+                                                    ?.toString(),
+                                              );
+                                            } on SecureSessionStorageException catch (
+                                              e
+                                            ) {
+                                              if (!context.mounted) return;
+                                              ScaffoldMessenger.of(
+                                                context,
+                                              ).showSnackBar(
+                                                SnackBar(
+                                                  content: Text(e.message),
+                                                  backgroundColor:
+                                                      Colors.redAccent,
+                                                ),
+                                              );
+                                              return;
+                                            }
 
                                             if (!context.mounted) return;
 

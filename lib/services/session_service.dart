@@ -1,6 +1,15 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:lungs_assistant_agent/state/smoke_sync.dart';
+
+class SecureSessionStorageException implements Exception {
+  final String message;
+  const SecureSessionStorageException(this.message);
+
+  @override
+  String toString() => message;
+}
 
 class SessionService {
   static const String _keyUid = 'uid';
@@ -9,7 +18,17 @@ class SessionService {
   static const String _keyToken = 'access_token';
   static const String _keyProfileCompleted = 'profile_completed';
 
-  static const FlutterSecureStorage _secureStorage = FlutterSecureStorage();
+  static FlutterSecureStorage _secureStorage = const FlutterSecureStorage();
+
+  @visibleForTesting
+  static void setSecureStorageForTesting(FlutterSecureStorage storage) {
+    _secureStorage = storage;
+  }
+
+  @visibleForTesting
+  static void resetSecureStorageForTesting() {
+    _secureStorage = const FlutterSecureStorage();
+  }
 
   /// Helper untuk memeriksa apakah data profil user sudah lengkap.
   static bool isProfileDataComplete(
@@ -41,6 +60,10 @@ class SessionService {
         weight > 0;
   }
 
+  /// Menyimpan sesi pengguna.
+  /// Wajib menyimpan JWT token secara aman terlebih dahulu ke FlutterSecureStorage.
+  /// Apabila penyimpanan token gagal atau token kosong, melempar
+  /// [SecureSessionStorageException] dan membatalkan penyimpanan sesi.
   static Future<void> saveSession(
     String uid,
     String name,
@@ -49,29 +72,44 @@ class SessionService {
     String? token,
   }) async {
     final prefs = await SharedPreferences.getInstance();
+    await prefs.remove(_keyToken);
+
+    final cleanedToken = token?.trim() ?? '';
+    if (cleanedToken.isEmpty) {
+      await clearSession();
+      throw const SecureSessionStorageException(
+        'Sesi login tidak memiliki token autentikasi yang valid.',
+      );
+    }
+
+    // Simpan & verifikasi token di secure storage terlebih dahulu.
+    // Jika gagal, lempar exception dan jangan simpan sesi di SharedPreferences.
+    await setToken(cleanedToken);
+
     await prefs.setString(_keyUid, uid);
     await prefs.setString(_keyName, name);
     await prefs.setString(_keyRole, role);
     if (profileCompleted != null) {
       await prefs.setBool(_keyProfileCompleted, profileCompleted);
     }
-    // Pastikan token sensitif tidak pernah tersimpan di SharedPreferences
-    await prefs.remove(_keyToken);
-    if (token != null && token.isNotEmpty) {
-      await setToken(token);
-    }
   }
 
   /// Membaca JWT token dari FlutterSecureStorage.
-  /// Jika ditemukan token lama (legacy) di SharedPreferences, migrasikan secara
-  /// aman ke FlutterSecureStorage lalu hapus dari SharedPreferences.
+  /// Jika ditemukan token lama (legacy) di SharedPreferences, migrasikan ke
+  /// FlutterSecureStorage dan hapus dari SharedPreferences.
+  /// Apabila migrasi ke FlutterSecureStorage gagal, JANGAN pernah mengembalikan
+  /// legacy token sebagai berhasil dimigrasikan.
   static Future<String?> getToken() async {
     final prefs = await SharedPreferences.getInstance();
     String? secureToken;
     try {
       secureToken = await _secureStorage.read(key: _keyToken);
     } catch (_) {
-      secureToken = null;
+      // Jangan pernah fallback ke pembacaan token plaintext jika secure storage gagal
+      if (prefs.containsKey(_keyToken)) {
+        await prefs.remove(_keyToken);
+      }
+      return null;
     }
 
     if (secureToken != null && secureToken.isNotEmpty) {
@@ -83,22 +121,52 @@ class SessionService {
 
     final legacyToken = prefs.getString(_keyToken);
     if (legacyToken != null && legacyToken.isNotEmpty) {
+      // Hapus token plaintext dari SharedPreferences terlebih dahulu
+      await prefs.remove(_keyToken);
       try {
         await _secureStorage.write(key: _keyToken, value: legacyToken);
-      } catch (_) {}
-      await prefs.remove(_keyToken);
-      return legacyToken;
+        final verified = await _secureStorage.read(key: _keyToken);
+        if (verified == legacyToken) {
+          return legacyToken;
+        }
+      } catch (_) {
+        // Migrasi gagal: bersihkan sesi dan jangan kembalikan legacyToken
+      }
+      await clearSession();
+      return null;
     }
 
     return null;
   }
 
+  /// Menyimpan JWT token ke FlutterSecureStorage dan memverifikasi bahwa token
+  /// dapat dibaca kembali. Melempar [SecureSessionStorageException] jika gagal.
   static Future<void> setToken(String token) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove(_keyToken);
+
+    final cleaned = token.trim();
+    if (cleaned.isEmpty) {
+      throw const SecureSessionStorageException(
+        'Token autentikasi tidak boleh kosong.',
+      );
+    }
+
     try {
-      await _secureStorage.write(key: _keyToken, value: token);
-    } catch (_) {}
+      await _secureStorage.write(key: _keyToken, value: cleaned);
+      final verified = await _secureStorage.read(key: _keyToken);
+      if (verified != cleaned) {
+        throw const SecureSessionStorageException(
+          'Gagal memverifikasi penyimpanan token keamanan pada perangkat.',
+        );
+      }
+    } on SecureSessionStorageException {
+      rethrow;
+    } catch (_) {
+      throw const SecureSessionStorageException(
+        'Gagal menyimpan sesi keamanan pada perangkat. Silakan coba lagi.',
+      );
+    }
   }
 
   static Future<Map<String, String>> getAuthHeaders({
@@ -168,16 +236,32 @@ class SessionService {
     await prefs.setBool('has_seen_app_tour_$uid', true);
   }
 
-  static Future<void> clearSession() async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.remove(_keyUid);
-    await prefs.remove(_keyName);
-    await prefs.remove(_keyRole);
-    await prefs.remove(_keyToken);
-    await prefs.remove(_keyProfileCompleted);
+  /// Menghapus seluruh data sesi di SharedPreferences dan FlutterSecureStorage.
+  /// Mengembalikan `true` apabila penghapusan di FlutterSecureStorage berhasil,
+  /// atau `false` apabila secure storage mengalami kegagalan platform (namun
+  /// SharedPreferences dan state memori tetap dibersihkan).
+  static Future<bool> clearSession() async {
+    var secureDeleted = true;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove(_keyUid);
+      await prefs.remove(_keyName);
+      await prefs.remove(_keyRole);
+      await prefs.remove(_keyToken);
+      await prefs.remove(_keyProfileCompleted);
+    } finally {
+      SmokeSync.instance.reset();
+    }
+
     try {
       await _secureStorage.delete(key: _keyToken);
-    } catch (_) {}
-    SmokeSync.instance.reset();
+    } catch (_) {
+      try {
+        await _secureStorage.deleteAll();
+      } catch (_) {
+        secureDeleted = false;
+      }
+    }
+    return secureDeleted;
   }
 }

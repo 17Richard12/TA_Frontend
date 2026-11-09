@@ -60,14 +60,21 @@ class AuthService {
       final data = response.data;
       if (data['status'] == 'success') {
         final userData = data['data'] as Map<String, dynamic>? ?? {};
-        final token = userData['access_token']?.toString();
-        if (token != null && token.isNotEmpty) {
-          await SessionService.setToken(token);
+        final token = userData['access_token']?.toString().trim() ?? '';
+        if (token.isEmpty) {
+          return {
+            'status': 'error',
+            'message':
+                'Server tidak mengembalikan token autentikasi yang valid.',
+          };
         }
+        await SessionService.setToken(token);
         return {'status': 'success', 'uid': userData['uid'], 'data': userData};
       } else {
         return {'status': 'error', 'message': data['message']};
       }
+    } on SecureSessionStorageException catch (e) {
+      return {'status': 'error', 'message': e.message};
     } on DioException catch (e) {
       return {'status': 'error', 'message': _handleDioError(e)};
     } catch (e) {
@@ -91,14 +98,21 @@ class AuthService {
       final data = response.data;
       if (data['status'] == 'success') {
         final userData = data['data'] as Map<String, dynamic>? ?? {};
-        final token = userData['access_token']?.toString();
-        if (token != null && token.isNotEmpty) {
-          await SessionService.setToken(token);
+        final token = userData['access_token']?.toString().trim() ?? '';
+        if (token.isEmpty) {
+          return {
+            'status': 'error',
+            'message':
+                'Server tidak mengembalikan token autentikasi yang valid.',
+          };
         }
+        await SessionService.setToken(token);
         return {'status': 'success', 'uid': userData['uid'], 'data': userData};
       } else {
         return {'status': 'error', 'message': data['message']};
       }
+    } on SecureSessionStorageException catch (e) {
+      return {'status': 'error', 'message': e.message};
     } on DioException catch (e) {
       return {'status': 'error', 'message': _handleDioError(e)};
     } catch (e) {
