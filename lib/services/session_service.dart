@@ -1,3 +1,4 @@
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:lungs_assistant_agent/state/smoke_sync.dart';
 
@@ -7,6 +8,8 @@ class SessionService {
   static const String _keyRole = 'role';
   static const String _keyToken = 'access_token';
   static const String _keyProfileCompleted = 'profile_completed';
+
+  static const FlutterSecureStorage _secureStorage = FlutterSecureStorage();
 
   /// Helper untuk memeriksa apakah data profil user sudah lengkap.
   static bool isProfileDataComplete(
@@ -52,19 +55,50 @@ class SessionService {
     if (profileCompleted != null) {
       await prefs.setBool(_keyProfileCompleted, profileCompleted);
     }
+    // Pastikan token sensitif tidak pernah tersimpan di SharedPreferences
+    await prefs.remove(_keyToken);
     if (token != null && token.isNotEmpty) {
-      await prefs.setString(_keyToken, token);
+      await setToken(token);
     }
   }
 
+  /// Membaca JWT token dari FlutterSecureStorage.
+  /// Jika ditemukan token lama (legacy) di SharedPreferences, migrasikan secara
+  /// aman ke FlutterSecureStorage lalu hapus dari SharedPreferences.
   static Future<String?> getToken() async {
     final prefs = await SharedPreferences.getInstance();
-    return prefs.getString(_keyToken);
+    String? secureToken;
+    try {
+      secureToken = await _secureStorage.read(key: _keyToken);
+    } catch (_) {
+      secureToken = null;
+    }
+
+    if (secureToken != null && secureToken.isNotEmpty) {
+      if (prefs.containsKey(_keyToken)) {
+        await prefs.remove(_keyToken);
+      }
+      return secureToken;
+    }
+
+    final legacyToken = prefs.getString(_keyToken);
+    if (legacyToken != null && legacyToken.isNotEmpty) {
+      try {
+        await _secureStorage.write(key: _keyToken, value: legacyToken);
+      } catch (_) {}
+      await prefs.remove(_keyToken);
+      return legacyToken;
+    }
+
+    return null;
   }
 
   static Future<void> setToken(String token) async {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(_keyToken, token);
+    await prefs.remove(_keyToken);
+    try {
+      await _secureStorage.write(key: _keyToken, value: token);
+    } catch (_) {}
   }
 
   static Future<Map<String, String>> getAuthHeaders({
@@ -141,6 +175,9 @@ class SessionService {
     await prefs.remove(_keyRole);
     await prefs.remove(_keyToken);
     await prefs.remove(_keyProfileCompleted);
+    try {
+      await _secureStorage.delete(key: _keyToken);
+    } catch (_) {}
     SmokeSync.instance.reset();
   }
 }

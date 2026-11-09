@@ -23,6 +23,18 @@ class AuthService {
           }
           handler.next(options);
         },
+        onError: (e, handler) async {
+          final statusCode = e.response?.statusCode;
+          final path = e.requestOptions.path;
+          final isCredentialCheck =
+              path.endsWith('/login') ||
+              path.endsWith('/register') ||
+              path.endsWith('/change-password');
+          if (statusCode == 401 && !isCredentialCheck) {
+            await SessionService.clearSession();
+          }
+          handler.next(e);
+        },
       ),
     );
     return dio;

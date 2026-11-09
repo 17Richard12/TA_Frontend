@@ -1,5 +1,9 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:http/http.dart' as http;
+import 'package:http/testing.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:lungs_assistant_agent/main.dart';
 import 'package:lungs_assistant_agent/screens/auth_screen.dart';
@@ -11,12 +15,14 @@ import 'package:lungs_assistant_agent/screens/account_screen.dart';
 import 'package:lungs_assistant_agent/screens/password_screen.dart';
 import 'package:lungs_assistant_agent/screens/edit_screen.dart';
 import 'package:lungs_assistant_agent/screens/edit_role_screen.dart';
+import 'package:lungs_assistant_agent/services/hospital_service.dart';
 import 'package:lungs_assistant_agent/services/session_service.dart';
 import 'package:lungs_assistant_agent/state/smoke_sync.dart';
 
 void main() {
   setUp(() {
     SharedPreferences.setMockInitialValues({});
+    FlutterSecureStorage.setMockInitialValues({});
     SmokeSync.instance.reset();
   });
 
@@ -109,6 +115,111 @@ void main() {
         expect(await SessionService.getRole(), isNull);
         expect(await SessionService.getToken(), isNull);
         expect(await SessionService.getProfileCompleted(), isNull);
+      },
+    );
+
+    test(
+      'stores JWT token in FlutterSecureStorage (not SharedPreferences) and migrates legacy tokens',
+      () async {
+        // 1. New session stores token only in FlutterSecureStorage
+        await SessionService.saveSession(
+          'uid_sec',
+          'Secure User',
+          'user',
+          profileCompleted: true,
+          token: 'secure_jwt_abc',
+        );
+        final prefs = await SharedPreferences.getInstance();
+        expect(prefs.getString('access_token'), isNull);
+        const secureStorage = FlutterSecureStorage();
+        expect(
+          await secureStorage.read(key: 'access_token'),
+          equals('secure_jwt_abc'),
+        );
+
+        // 2. Legacy token in SharedPreferences is migrated to FlutterSecureStorage and removed from SharedPreferences
+        FlutterSecureStorage.setMockInitialValues({});
+        SharedPreferences.setMockInitialValues({
+          'uid': 'uid_legacy',
+          'access_token': 'legacy_jwt_xyz',
+        });
+        final migratedToken = await SessionService.getToken();
+        expect(migratedToken, equals('legacy_jwt_xyz'));
+        final prefsAfter = await SharedPreferences.getInstance();
+        expect(prefsAfter.getString('access_token'), isNull);
+        expect(
+          await secureStorage.read(key: 'access_token'),
+          equals('legacy_jwt_xyz'),
+        );
+      },
+    );
+
+    test(
+      'PlacesService proxies nearby hospital search through backend with Bearer token and handles 401 expiry',
+      () async {
+        await SessionService.saveSession(
+          'uid_map',
+          'Map User',
+          'user',
+          token: 'map_jwt_token',
+        );
+
+        Uri? requestedUri;
+        String? authHeader;
+
+        final mockClient = MockClient((http.Request request) async {
+          requestedUri = request.url;
+          authHeader = request.headers['Authorization'];
+          return http.Response(
+            json.encode({
+              'status': 'success',
+              'data': [
+                {
+                  'name': 'RSUD Fatmawati',
+                  'place_id': 'p1',
+                  'lat': -6.29,
+                  'lng': 106.79,
+                  'vicinity': 'Jl. RS Fatmawati',
+                  'rating': 4.4,
+                  'open_now': true,
+                  'doctor_schedules': [],
+                },
+                {
+                  'name': 'RSIA Kemang',
+                  'place_id': 'p2',
+                  'lat': -6.28,
+                  'lng': 106.81,
+                  'vicinity': 'Kemang',
+                },
+              ],
+            }),
+            200,
+          );
+        });
+
+        final hospitals = await PlacesService.fetchNearbyHospitals(
+          -6.29,
+          106.79,
+          client: mockClient,
+        );
+        expect(requestedUri?.path, equals('/api/hospitals/nearby'));
+        expect(authHeader, equals('Bearer map_jwt_token'));
+        expect(hospitals.length, equals(1));
+        expect(hospitals.first['name'], equals('RSUD Fatmawati'));
+
+        // Verify 401 clears expired session
+        final unauthClient = MockClient((http.Request request) async {
+          return http.Response(json.encode({'detail': 'Session expired'}), 401);
+        });
+        await expectLater(
+          PlacesService.fetchNearbyHospitals(
+            -6.29,
+            106.79,
+            client: unauthClient,
+          ),
+          throwsException,
+        );
+        expect(await SessionService.getToken(), isNull);
       },
     );
   });
