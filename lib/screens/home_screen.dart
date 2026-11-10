@@ -50,6 +50,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   // State untuk Analisa AI Rangkuman & Feedback Kemarin
   bool _yesterdaySummaryLoading = true;
+  bool _yesterdaySummaryInFlight = false;
   Map<String, dynamic>? _yesterdaySummaryData;
   String? _yesterdaySummaryError;
 
@@ -92,41 +93,57 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _loadYesterdayAiSummary({bool forceRefresh = false}) async {
-    if (!mounted) return;
+    if (!mounted || _yesterdaySummaryInFlight) return;
+    _yesterdaySummaryInFlight = true;
     setState(() {
       _yesterdaySummaryLoading = true;
       _yesterdaySummaryError = null;
     });
 
-    final res = await DashboardService.getYesterdayAiSummary(
-      widget.userUid,
-      date: _todayTimestamp,
-      forceRefresh: forceRefresh,
-    );
+    try {
+      final res = await DashboardService.getYesterdayAiSummary(
+        widget.userUid,
+        date: _todayTimestamp,
+        forceRefresh: forceRefresh,
+      );
 
-    if (!mounted) return;
-    if (res['status'] == 'success' && res['data'] is Map<String, dynamic>) {
-      final responseData = res['data'] as Map<String, dynamic>;
-      setState(() {
-        _yesterdaySummaryData = responseData;
-        _yesterdaySummaryLoading = false;
-      });
-      if (forceRefresh && responseData['rate_limited'] == true && mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text(
-              'Analisa sudah mutakhir dengan data kemarin saat ini. Coba lagi beberapa saat jika ingin memuat ulang.',
-            ),
-            duration: Duration(seconds: 2),
-          ),
-        );
+      if (!mounted) return;
+      if (res['status'] == 'success' && res['data'] is Map<String, dynamic>) {
+        final responseData = res['data'] as Map<String, dynamic>;
+        setState(() {
+          _yesterdaySummaryData = responseData;
+          _yesterdaySummaryLoading = false;
+        });
+        if (forceRefresh && mounted) {
+          if (responseData['rate_limited'] == true) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text(
+                  'Analisa sudah mutakhir dengan data kemarin saat ini. Coba lagi beberapa saat jika ingin memuat ulang.',
+                ),
+                duration: Duration(seconds: 2),
+              ),
+            );
+          } else if (responseData['generation_in_progress'] == true) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text(
+                  'Analisa AI sedang diproses. Menampilkan ringkasan sementara.',
+                ),
+                duration: Duration(seconds: 2),
+              ),
+            );
+          }
+        }
+      } else {
+        setState(() {
+          _yesterdaySummaryError =
+              res['message']?.toString() ?? 'Gagal memuat analisa AI kemarin.';
+          _yesterdaySummaryLoading = false;
+        });
       }
-    } else {
-      setState(() {
-        _yesterdaySummaryError =
-            res['message']?.toString() ?? 'Gagal memuat analisa AI kemarin.';
-        _yesterdaySummaryLoading = false;
-      });
+    } finally {
+      _yesterdaySummaryInFlight = false;
     }
   }
 
