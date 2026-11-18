@@ -369,11 +369,11 @@ void main() {
       'NewsService and YouTubeService report clear configuration error when API keys are not provided',
       () async {
         await expectLater(
-          NewsService.fetchTopHeadlines(),
+          NewsService.fetchTopHeadlines(apiKeyOverride: ''),
           throwsA(isA<StateError>()),
         );
         await expectLater(
-          YouTubeService.fetchVideos(),
+          YouTubeService.fetchVideos(apiKeyOverride: ''),
           throwsA(isA<StateError>()),
         );
       },

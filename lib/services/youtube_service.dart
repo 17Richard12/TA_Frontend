@@ -3,8 +3,11 @@ import 'package:lungs_assistant_agent/constants.dart';
 import 'package:http/http.dart' as http;
 
 class YouTubeService {
-  static Future<List<dynamic>> fetchVideos({http.Client? client}) async {
-    final apiKey = AppConstants.requireYoutubeApiKey();
+  static Future<List<dynamic>> fetchVideos({
+    http.Client? client,
+    String? apiKeyOverride,
+  }) async {
+    final apiKey = AppConstants.requireYoutubeApiKey(override: apiKeyOverride);
     final httpClient = client ?? http.Client();
     final response = await httpClient.get(
       Uri.parse(

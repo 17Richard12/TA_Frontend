@@ -12,7 +12,17 @@ import 'package:intl/date_symbol_data_local.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await initializeDateFormatting('id_ID', null);
-  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+  try {
+    if (Firebase.apps.isEmpty) {
+      await Firebase.initializeApp(
+        options: DefaultFirebaseOptions.currentPlatform,
+      );
+    }
+  } on FirebaseException catch (e) {
+    if (e.code != 'duplicate-app') {
+      rethrow;
+    }
+  }
   await NotificationService.instance.init();
   // Check session
   final uid = await SessionService.getUid();
@@ -23,7 +33,15 @@ void main() async {
   Widget initialScreen = AuthScreen();
   if (uid != null && name != null && token != null && token.isNotEmpty) {
     bool? profileCompleted = await SessionService.getProfileCompleted();
-    final userRes = await AuthService().getUser(uid);
+    final userRes = await AuthService()
+        .getUser(uid)
+        .timeout(
+          const Duration(seconds: 5),
+          onTimeout: () => {
+            'status': 'error',
+            'message': 'Connection timeout during startup check',
+          },
+        );
     if (userRes['status'] == 'success') {
       final userData = userRes['data'] as Map<String, dynamic>?;
       final serverRole = (userData?['role']?.toString() ?? role)

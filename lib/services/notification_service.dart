@@ -40,14 +40,22 @@ class NotificationService {
 
       await _plugin.initialize(settings);
 
-      final androidPlugin = _plugin
-          .resolvePlatformSpecificImplementation<
-            AndroidFlutterLocalNotificationsPlugin
-          >();
-      await androidPlugin?.requestNotificationsPermission();
-
       _initialized = true;
-      await scheduleDailyReminders();
+
+      // Jalankan permintaan izin & penjadwalan secara asinkron (non-blocking)
+      // agar tidak menahan proses booting / splash screen utama aplikasi.
+      Future<void>(() async {
+        try {
+          final androidPlugin = _plugin
+              .resolvePlatformSpecificImplementation<
+                AndroidFlutterLocalNotificationsPlugin
+              >();
+          await androidPlugin?.requestNotificationsPermission();
+          await scheduleDailyReminders();
+        } catch (e) {
+          debugPrint('NotificationService post-init error: $e');
+        }
+      });
     } catch (e) {
       debugPrint('NotificationService.init error: $e');
     }

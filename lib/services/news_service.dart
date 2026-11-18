@@ -3,8 +3,11 @@ import 'package:lungs_assistant_agent/constants.dart';
 import 'package:http/http.dart' as http;
 
 class NewsService {
-  static Future<List<dynamic>> fetchTopHeadlines({http.Client? client}) async {
-    final apiKey = AppConstants.requireNewsApiKey();
+  static Future<List<dynamic>> fetchTopHeadlines({
+    http.Client? client,
+    String? apiKeyOverride,
+  }) async {
+    final apiKey = AppConstants.requireNewsApiKey(override: apiKeyOverride);
     final httpClient = client ?? http.Client();
     final response = await httpClient.get(
       Uri.parse('https://newsapi.org/v2/everything?q=lungs&apiKey=$apiKey'),

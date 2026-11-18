@@ -250,129 +250,6 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  void _showAddSmokeConfirmationBottomSheet() {
-    final nextCount = _smokeCount + 1;
-    final bool willExceedHigh =
-        _smokeLimitHigh > 0 && nextCount >= _smokeLimitHigh;
-    final bool willReachLow = _smokeLimitLow > 0 && nextCount >= _smokeLimitLow;
-
-    String warningNote =
-        'Coba selesaikan daily activities-mu untuk mengalihkan rasa ingin merokok.\n\nApakah kamu yakin ingin tetap menambah jumlah rokok?';
-    if (willExceedHigh) {
-      warningNote =
-          'PERINGATAN BATAS TINGGI! Menambah rokok ini akan membuat konsumsimu menjadi $nextCount batang (melewati/mencapai batas tinggi $_smokeLimitHigh batang).\n\nSangat disarankan untuk berhenti merokok hari ini dan lakukan aktivitas sehat.';
-    } else if (willReachLow) {
-      warningNote =
-          'Peringatan Batas Rendah: Menambah rokok ini akan membuat konsumsimu mencapai $nextCount batang (batas rendah: $_smokeLimitLow batang, batas tinggi: $_smokeLimitHigh batang).\n\nYuk alihkan dengan daily activities!';
-    }
-
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.transparent,
-      isScrollControlled: true,
-      builder: (ctx) => Container(
-        padding: const EdgeInsets.fromLTRB(24, 20, 24, 28),
-        decoration: const BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              width: 44,
-              height: 5,
-              decoration: BoxDecoration(
-                color: Colors.grey.shade300,
-                borderRadius: BorderRadius.circular(10),
-              ),
-            ),
-            const SizedBox(height: 20),
-            Container(
-              width: 64,
-              height: 64,
-              decoration: BoxDecoration(
-                color: (willExceedHigh ? Colors.redAccent : Colors.orange)
-                    .withValues(alpha: 0.12),
-                shape: BoxShape.circle,
-              ),
-              child: Icon(
-                Icons.warning_amber_rounded,
-                color: willExceedHigh ? Colors.redAccent : Colors.orange,
-                size: 36,
-              ),
-            ),
-            const SizedBox(height: 16),
-            Text(
-              willExceedHigh ? 'Batas Tinggi Rokok! 🚨' : 'Tunggu Dulu! ✋',
-              style: const TextStyle(
-                fontWeight: FontWeight.bold,
-                fontSize: 19,
-                color: Colors.black87,
-              ),
-            ),
-            const SizedBox(height: 12),
-            Text(
-              warningNote,
-              textAlign: TextAlign.center,
-              style: const TextStyle(
-                fontSize: 14,
-                color: Colors.black87,
-                height: 1.5,
-              ),
-            ),
-            const SizedBox(height: 24),
-            Row(
-              children: [
-                Expanded(
-                  child: OutlinedButton(
-                    onPressed: () => Navigator.pop(ctx),
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: Colors.grey.shade700,
-                      side: BorderSide(color: Colors.grey.shade300),
-                      padding: const EdgeInsets.symmetric(vertical: 14),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(14),
-                      ),
-                    ),
-                    child: const Text(
-                      'BATAL',
-                      style: TextStyle(fontWeight: FontWeight.bold),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: ElevatedButton(
-                    onPressed: () {
-                      Navigator.pop(ctx);
-                      _updateSmokeCount(_smokeCount + 1);
-                    },
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: willExceedHigh
-                          ? Colors.redAccent
-                          : Colors.orange,
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(vertical: 14),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(14),
-                      ),
-                      elevation: 0,
-                    ),
-                    child: const Text(
-                      'TETAP TAMBAH',
-                      style: TextStyle(fontWeight: FontWeight.bold),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
   // --- FETCH DATA ACTIVITIES ---
   Future<void> _loadActivities() async {
     setState(() => _activitiesLoading = true);
@@ -1297,8 +1174,8 @@ class _HomeScreenState extends State<HomeScreen> {
                                       ),
                                       const SizedBox(width: 16),
                                       GestureDetector(
-                                        onTap:
-                                            _showAddSmokeConfirmationBottomSheet,
+                                        onTap: () =>
+                                            _updateSmokeCount(_smokeCount + 1),
                                         child: _smallCircleButton(Icons.add),
                                       ),
                                     ],
